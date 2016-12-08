@@ -1,0 +1,28 @@
+###INSTALL TELOMERECAT###
+
+This document is intedned for intermediate to advanced users. For a more gentle introduction to installing telomerecat consult the manual found here: ####
+
+You have download the source code for telomerecat. It's a lot easier to install telomerecat via `pip` (pip install telomerecat). Below you will find instructions on how to install telomerecat from the source code. If you are familiar with installing python programs from the source code you will notice that telomerecat is almost identical.
+
+If you don't want to install anything or are in an administrated environment and cannot install dependencies then you might consider using the pre-compiled binaries that can be found here: ####
+
+Other alternatives (such as using a python virtualenv) are available in the manual found here: ####
+
+---- INSTALLING FROM SOURCE ----
+
+-- Dependencies -- 
+
+First make sure you have the following dependicies. These are all python programs which can be installed via `pip`
+
+- argparse
+- pysam 
+- parabam
+- numpy
+
+IMPORTANT:
+
+If you wish to run the `length` portion of telomerecat (and you most likely will) you will also need bowtie2 installed on your system and on your PATH. bowtie2  is available here: ### and detailed instructions on how to install bowtie2 can be found here: ###
+
+-- Installation --
+
+Telomerecat is installed in the same way as many other python programs. The following commands will ensure that telomerecat is installed correctly. Before doing this, please ensure you have read the dependencies section.
