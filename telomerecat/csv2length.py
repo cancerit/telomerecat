@@ -175,9 +175,11 @@ class Csv2Length(core.TelomerecatInterface):
                                         cmd_run=cmd_run)
 
     def run_cmd(self):
+        output_paths = self.__handle_cmd_outpaths__()
+
         self.run(input_paths = self.cmd_args.input,
                  correct_f2a = not self.cmd_args.disable_correction,
-                 output_paths = self.cmd_args.output,
+                 output_paths = output_paths,
                  prior_weight = self.cmd_args.prior_weight,
                  simulator_N = self.cmd_args.simulator_runs)
 
@@ -208,6 +210,16 @@ class Csv2Length(core.TelomerecatInterface):
             self.__output__("\n",1)
 
         self.__goodbye__()
+        return output_paths
+
+    def __handle_cmd_outpaths__(self):
+        output_paths = None
+        if self.cmd_args.output is None:
+            output_paths = []
+        else:
+            output_paths = self.cmd_args.output.split(",")
+            output_paths = [p.strip() for p in output_paths]
+
         return output_paths
 
     def __get_length_from_dataframe__(self, counts,
@@ -314,6 +326,13 @@ class Csv2Length(core.TelomerecatInterface):
 
         parser.add_argument('input',metavar='CSV(s)', nargs='+',
             help="The CSV(s) that we wish to reanalyse")
+        parser.add_argument('--output',
+            metavar='CSV',type=str,nargs='?',default=None,
+            help=('Specify output path for length estimation CSV.\n'
+                  'If more than one input CSV is provided\n' 
+                  'the user will need to provide a comma seperated list\n'
+                  'with one entry per input. For example:\n\t'
+                  '--output=\"zzz.csv, yyy.csv\". [Default: None]'))
         parser.add_argument('-s', help=SUPPRESS)
         parser.add_argument('-f', help=SUPPRESS)
 
