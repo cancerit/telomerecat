@@ -112,7 +112,7 @@ class Bam2Length(TelomerecatInterface):
             help=('BAM file(s) for which we wish to\n'
                   'generate telomere length estimates'))
         parser.add_argument('-x','--discard_telbams',
-            action="store_true",default=True,
+            action="store_true",default=False,
             help=('The program will NOT save any TELBAMs\n'
                    'generated as part of the analysis'))
 
