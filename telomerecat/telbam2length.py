@@ -801,10 +801,12 @@ class Telbam2Length(TelomerecatInterface):
     def run_cmd(self):
         self.run(input_paths = self.cmd_args.input,
                  inserts_path = self.cmd_args.insert,
+                 correct_f2a = not self.cmd_args.disable_correction,
                  output_path = self.cmd_args.output)
 
     def run(self,input_paths,
                  output_path = None,
+                 correct_f2a = True,
                  inserts_path = None):
         
         """The main function for invoking the part of the 
@@ -863,7 +865,8 @@ class Telbam2Length(TelomerecatInterface):
                                        cmd_run=False)
 
         length_interface.run(input_paths=[temp_csv_path], 
-                             output_paths=[output_csv_path])
+                             output_paths=[output_csv_path],
+                             correct_f2a=correct_f2a)
 
         self.__print_output_information__(output_csv_path)
         self.__goodbye__()
