@@ -514,7 +514,9 @@ class ReadStatsFactory(object):
         read_counts = self.read_array_to_counts(read_array,
                                                 error_profile,
                                                 sample_variance)
+
         self.__delete_analysis_paths__(read_stat_paths)
+        
         return read_counts
 
     def __delete_analysis_paths__(self, read_stat_paths):
@@ -543,8 +545,7 @@ class ReadStatsFactory(object):
         dif_counts = read_counts - random_counts
 
         if thresh is None:
-            mask = np.zeros(read_counts.shape)
-            mask[20:,20:] = 1
+            mask = self.__get_exclusion_mask__(read_counts)
             arg_max_index = (read_counts * mask).argmax()
             dif_loci_x,dif_loci_y = np.unravel_index(arg_max_index,
                                                      dif_counts.shape)
@@ -558,10 +559,7 @@ class ReadStatsFactory(object):
         error_profile = (dif_counts * (dif_counts > 0))\
                                  > thresh
 
-        error_profile[11:,30:] = 0
-        error_profile[35:,0] = 0
-        error_profile[50:,:] = 0
-    
+        error_profile = self.__remove_noise__(error_profile)
         error_profile = self.__prune_error_profile__(error_profile)
         error_profile = self.__rationalise_error_profile__(error_profile)
 
@@ -569,6 +567,21 @@ class ReadStatsFactory(object):
         error_profile[:ten_percent,:] = 1
 
         return error_profile
+
+    def __remove_noise__(self, error_profile):
+        row_max, col_max = error_profile.shape
+        error_profile[int(row_max*.11):,int(col_max*.7):] = 0
+        error_profile[int(row_max*.35):,0] = 0
+        error_profile[int(row_max*.45):,:] = 0 
+
+        return error_profile
+
+    def __get_exclusion_mask__(self, read_counts):
+        mask = np.zeros(read_counts.shape)
+        x_start = int(read_counts.shape[0] * .2)
+        y_start = int(read_counts.shape[1] * .5)
+        mask[x_start:,y_start:] = 1
+        return mask
 
     def __prune_error_profile__(self, error_profile):
         first_locis = self.__get_first_loci__(error_profile)
@@ -714,7 +727,7 @@ class ReadStatsFactory(object):
 
             return return_stats
 
-        def rule(reads,constants,master):
+        def rule(reads, constants, master):
             simple_reads = [simple_read_factory.get_simple_read(read) \
                                                          for read in reads]
             return_dat = np.zeros((2,6))
