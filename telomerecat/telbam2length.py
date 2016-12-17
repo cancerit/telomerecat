@@ -808,7 +808,7 @@ class Telbam2Length(TelomerecatInterface):
                  output_path = self.cmd_args.output)
 
     def run(self,input_paths,
-                 trim = -1,
+                 trim = 0,
                  output_path = None,
                  correct_f2a = True,
                  inserts_path = None):
@@ -848,6 +848,9 @@ class Telbam2Length(TelomerecatInterface):
             self.__output__(sample_intro,2)
 
             vital_stats = vital_stats_finder.get_vital_stats(sample_path)
+            if trim > 0:
+                vital_stats["read_len"] = vital_stats["read_len"] - trim
+                
             self.__check_vital_stats_insert_size__(inserts_path,
                                                     insert_length_generator,
                                                     vital_stats)
