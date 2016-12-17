@@ -27,7 +27,7 @@ from telomerecat.core import TelomerecatInterface
 
 class SimpleReadFactory(object):
 
-    def __init__(self,vital_stats=None,trim_reads=False):
+    def __init__(self, vital_stats=None, trim_reads=0):
         self._SimpleRead = namedtuple("SimpleRead","seq qual" +
                                       " five_prime pattern mima_loci n_loci"+
                                       " avg_qual")
@@ -48,8 +48,9 @@ class SimpleReadFactory(object):
 
     def get_simple_read(self,read):
         seq,qual = self.__flip_and_compliment__(read)
-        if self._trim_reads:
-            seq,qual = self.__trim_seq__(seq,qual)
+        if self._trim_reads > 0:
+            seq,qual = (seq[:self._trim_reads],
+                        qual[:self._trim_reads])
 
         (mima_loci,frameshift_loci),pattern = \
                 self.mima_logic.get_telo_mismatch(seq)
@@ -493,15 +494,15 @@ class ReadStatsFactory(object):
     def __init__(self,temp_dir,
                       total_procs=4,
                       task_size = 5000,
-                      full_read_stats=True,
+                      trim_reads = -1,
                       debug_print=False):
 
         self.temp_dir = temp_dir
         self._total_procs = total_procs
         self._task_size = task_size
 
-        self._full_read_stats = full_read_stats
         self._debug_print = debug_print
+        self._trim = trim_reads
 
     def get_read_counts(self,path,vital_stats):
         read_stat_paths = self.run_read_stat_rule(path, vital_stats)
@@ -710,7 +711,8 @@ class ReadStatsFactory(object):
                                 vital_stats,
                                 keep_in_temp=True):
 
-        simple_read_factory = SimpleReadFactory(vital_stats)
+        simple_read_factory = SimpleReadFactory(vital_stats,
+                                                trim_reads=self._trim)
         phred_offset = vital_stats["phred_offset"]
 
         maxtrix_max = (vital_stats["max_qual"] - phred_offset)+1
@@ -800,11 +802,13 @@ class Telbam2Length(TelomerecatInterface):
 
     def run_cmd(self):
         self.run(input_paths = self.cmd_args.input,
+                 trim = self.cmd_args.trim,
                  inserts_path = self.cmd_args.insert,
                  correct_f2a = not self.cmd_args.disable_correction,
                  output_path = self.cmd_args.output)
 
     def run(self,input_paths,
+                 trim = -1,
                  output_path = None,
                  correct_f2a = True,
                  inserts_path = None):
@@ -850,7 +854,8 @@ class Telbam2Length(TelomerecatInterface):
 
             read_type_counts = self.__get_read_types__(sample_path,
                                                        vital_stats,
-                                                       self.total_procs)
+                                                       self.total_procs,
+                                                       trim)
 
             self.__write_to_csv__(read_type_counts,
                                     vital_stats,
@@ -902,11 +907,13 @@ class Telbam2Length(TelomerecatInterface):
     def __get_read_types__(self,sample_path,
                                 vital_stats,
                                 total_procs,
+                                trim,
                                 read_stats_factory=None):
 
         if read_stats_factory is None:
             read_stats_factory = ReadStatsFactory(temp_dir=self.temp_dir,
                                                   total_procs=total_procs,
+                                                  trim_reads=trim,
                                                   debug_print=False)
             
         read_type_counts = read_stats_factory.get_read_counts(sample_path,
@@ -973,15 +980,20 @@ class Telbam2Length(TelomerecatInterface):
                self.header_line,
                self.header_line,))
 
-        parser.add_argument('input',metavar='TELBAM(S)', nargs='+',
+        parser.add_argument('input', metavar='TELBAM(S)', nargs='+',
             help="The TELBAM(s) that we wish to analyse")
         parser.add_argument('--output',
-            metavar='CSV',type=str,nargs='?',default=None,
-            help='Specify output path for length estimation CSV.\n'+\
-                'Automatically generated if left blank [Default: None]')
-        parser.add_argument('-s',type=int,nargs='?',default=10000
-            ,help="The amount of reads considered by each\n"\
+            metavar='CSV',type=str, nargs='?', default=None,
+            help=('Specify output path for length estimation CSV.\n'
+                  'Automatically generated if left blank [Default: None]'))
+        parser.add_argument('-s',type=int, nargs='?', default=10000
+            ,help="The amount of reads considered by each\n"
                     "distributed task. [Default: 10000]")
+        parser.add_argument('-t',"--trim", type=int, nargs='?', default=0
+            ,help="Use only the amount of sequence specified by this  \n"
+                  "option (i.e if the value 90 is supplied\n"
+                  "then only the first 90 bases are\n"
+                  "considered) [Default: Whole read]")
 
         return parser
 
