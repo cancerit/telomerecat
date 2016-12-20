@@ -494,7 +494,7 @@ class ReadStatsFactory(object):
     def __init__(self,temp_dir,
                       total_procs=4,
                       task_size = 5000,
-                      trim_reads = -1,
+                      trim_reads = 0,
                       debug_print=False):
 
         self.temp_dir = temp_dir
@@ -544,15 +544,23 @@ class ReadStatsFactory(object):
 
     def __array_to_profile__(self,read_counts,random_counts, thresh = None):
         dif_counts = read_counts - random_counts
+        ten_percent = int(read_counts.shape[0] * .1)
 
         if thresh is None:
             mask = self.__get_exclusion_mask__(read_counts)
             arg_max_index = (read_counts * mask).argmax()
             dif_loci_x,dif_loci_y = np.unravel_index(arg_max_index,
                                                      dif_counts.shape)
-            hi_thresh = sorted(dif_counts[dif_loci_x-10:dif_loci_x+10,
-                                dif_loci_y-15:dif_loci_y+1].flatten())[::-1]
+
+            hi_thresh = dif_counts[int(dif_loci_x-ten_percent):\
+                                  int(dif_loci_x+ten_percent),
+                                  dif_loci_y-15:\
+                                  dif_loci_y+1]
+            hi_thresh = hi_thresh.flatten()
+
             thresh = np.percentile(hi_thresh,95)
+
+            print thresh
 
         if self._debug_print:
             print 'Thresh:',thresh
@@ -564,7 +572,6 @@ class ReadStatsFactory(object):
         error_profile = self.__prune_error_profile__(error_profile)
         error_profile = self.__rationalise_error_profile__(error_profile)
 
-        ten_percent = int(read_counts.shape[0] * .1) + 1
         error_profile[:ten_percent,:] = 1
 
         return error_profile
@@ -573,7 +580,7 @@ class ReadStatsFactory(object):
         row_max, col_max = error_profile.shape
         error_profile[int(row_max*.11):,int(col_max*.7):] = 0
         error_profile[int(row_max*.35):,0] = 0
-        error_profile[int(row_max*.45):,:] = 0 
+        error_profile[int(row_max*.55):,:] = 0 
 
         return error_profile
 
