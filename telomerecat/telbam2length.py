@@ -543,36 +543,44 @@ class ReadStatsFactory(object):
         return read_variance
 
     def __array_to_profile__(self,read_counts,random_counts, thresh = None):
-        dif_counts = read_counts - random_counts
         ten_percent = int(read_counts.shape[0] * .1)
 
-        if thresh is None:
-            mask = self.__get_exclusion_mask__(read_counts)
-            arg_max_index = (read_counts * mask).argmax()
-            dif_loci_x,dif_loci_y = np.unravel_index(arg_max_index,
-                                                     dif_counts.shape)
+        dif_counts = read_counts - random_counts
+        error_profile = dif_counts > 0
+        error_profile[:,90:] = False
+        error_profile[90:,:] = False
+        error_profile[:ten_percent,:] = True
+        error_profile = error_profile * 1
 
-            hi_thresh = dif_counts[int(dif_loci_x-ten_percent):\
-                                  int(dif_loci_x+ten_percent),
-                                  dif_loci_y-15:\
-                                  dif_loci_y+1]
-            hi_thresh = hi_thresh.flatten()
+        # ten_percent = int(read_counts.shape[0] * .1)
 
-            thresh = np.percentile(hi_thresh,95)
+        # if thresh is None:
+        #     mask = self.__get_exclusion_mask__(read_counts)
+        #     arg_max_index = (read_counts * mask).argmax()
+        #     dif_loci_x,dif_loci_y = np.unravel_index(arg_max_index,
+        #                                              dif_counts.shape)
 
-            print thresh
+        #     hi_thresh = dif_counts[int(dif_loci_x-ten_percent):\
+        #                           int(dif_loci_x+ten_percent),
+        #                           dif_loci_y-15:\
+        #                           dif_loci_y+1]
+        #     hi_thresh = hi_thresh.flatten()
 
-        if self._debug_print:
-            print 'Thresh:',thresh
+        #     thresh = np.percentile(hi_thresh,95)
 
-        error_profile = (dif_counts * (dif_counts > 0))\
-                                 > thresh
+        #     print thresh
 
-        error_profile = self.__remove_noise__(error_profile)
-        error_profile = self.__prune_error_profile__(error_profile)
-        error_profile = self.__rationalise_error_profile__(error_profile)
+        # if self._debug_print:
+        #     print 'Thresh:',thresh
 
-        error_profile[:ten_percent,:] = 1
+        # error_profile = (dif_counts * (dif_counts > 0))\
+        #                          > thresh
+
+        # error_profile = self.__remove_noise__(error_profile)
+        # error_profile = self.__prune_error_profile__(error_profile)
+        # error_profile = self.__rationalise_error_profile__(error_profile)
+
+        # error_profile[:ten_percent,:] = 1
 
         return error_profile
 
@@ -723,40 +731,78 @@ class ReadStatsFactory(object):
         phred_offset = vital_stats["phred_offset"]
 
         maxtrix_max = (vital_stats["max_qual"] - phred_offset)+1
-        matrix_shape = (vital_stats["read_len"]+1,maxtrix_max)
+        matrix_shape = (vital_stats["read_len"]+1,101)
 
-        def get_return_stats(reads):
+        def get_return_stats(reads,coords):
 
             return_stats = [len(reads[0].mima_loci),
                             int(reads[0].five_prime),
                             len(reads[1].mima_loci),
                             int(reads[1].five_prime),
                             reads[0].avg_qual,
-                            reads[1].avg_qual]
+                            reads[1].avg_qual,
+                            coords[0],
+                            coords[1]]
 
             return return_stats
+
+        def qual_coord(loci,quals,offset):
+            if len(loci) == 0:
+                coord = 0
+            elif len(loci) == len(quals):
+                coord = 100
+            elif len(loci) > 0:
+                loci_quals = []
+                all_quals = []
+
+                for i in xrange(len(quals)):
+                    qual_byte = ord(quals[i]) - offset
+                    all_quals.append(qual_byte)
+                    if i in loci:
+                        loci_quals.append(qual_byte)
+
+                mean_qual = np.mean(all_quals)
+                mean_loci = np.mean(loci_quals)
+
+                qual_ratio = mean_loci / mean_qual
+
+                if qual_ratio > 1:
+                    coord = 100
+                else:
+                    #print mean_loci, mean_qual, mean_loci / mean_qual, len(loci)
+                    coord = int(round((mean_loci / mean_qual) * 100,0))
+
+            return coord
+
 
         def rule(reads, constants, master):
             simple_reads = [simple_read_factory.get_simple_read(read) \
                                                          for read in reads]
-            return_dat = np.zeros((2,6))
-            return_dat[0,:] = get_return_stats(simple_reads)
-            return_dat[1,:] = get_return_stats(simple_reads[::-1])
-
+            
             random_counts = np.zeros(matrix_shape)
             mima_counts = np.zeros(matrix_shape)
 
+            coords = []
+
             for read in simple_reads:
-                mima_counts[read.n_loci,int(read.avg_qual)] += 1
+                mima_coord = qual_coord(read.mima_loci, read.qual, phred_offset)
+                coords.append(mima_coord)
+                mima_counts[read.n_loci,mima_coord] += 1
 
                 #sample_size = int(np.random.uniform(1,80))
                 sample_size = len(read.mima_loci)
                 if sample_size > 0:
-                    rand_quals  = np.random.choice(list(read.qual),sample_size)
-                    qual_bytes  = [ord(q) - phred_offset for q in rand_quals]
-                    rand_avg = np.mean(qual_bytes)
+                    rand_quals  = \
+                        np.random.choice(xrange(len(read.qual)),sample_size)
+                    rand_coord = \
+                            qual_coord(rand_quals, read.qual, phred_offset)
 
-                    random_counts[int(sample_size),int(rand_avg)] += 1
+                    random_counts[int(sample_size),rand_coord] += 1
+
+
+            return_dat = np.zeros((2,8))
+            return_dat[0,:] = get_return_stats(simple_reads,coords)
+            return_dat[1,:] = get_return_stats(simple_reads[::-1],coords[::-1])
 
             results = {"read_array":np.array(return_dat),
                       "random_counts":random_counts,
@@ -764,7 +810,7 @@ class ReadStatsFactory(object):
 
             return results
 
-        structures = {"read_array":{"data":np.zeros((2,6)),
+        structures = {"read_array":{"data":np.zeros((2,8)),
                                     "store_method":"vstack"},
                      "mima_counts":{"data":np.zeros(matrix_shape),
                                     "store_method":"cumu"},
