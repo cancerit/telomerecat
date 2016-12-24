@@ -545,12 +545,17 @@ class ReadStatsFactory(object):
     def __array_to_profile__(self,read_counts,random_counts, thresh = None):
         ten_percent = int(read_counts.shape[0] * .1)
 
-        dif_counts = read_counts - random_counts
-        error_profile = dif_counts > 0
-        error_profile[:,90:] = False
-        error_profile[90:,:] = False
-        error_profile[:ten_percent,:] = True
-        error_profile = error_profile * 1
+        mask = np.ones(read_counts.shape)
+        mask[:,95:] = 0
+        mask[95:,:] = 0
+        
+        dif_counts = (read_counts - random_counts) * mask
+        threshold = self.__get_threshold__(dif_counts)
+
+        error_profile = (dif_counts > threshold) * 1
+        error_profile[:ten_percent,:] = 1
+
+        return error_profile
 
         # ten_percent = int(read_counts.shape[0] * .1)
 
@@ -582,7 +587,13 @@ class ReadStatsFactory(object):
 
         # error_profile[:ten_percent,:] = 1
 
-        return error_profile
+    def __get_threshold__(self, dif_counts):
+        relevant = dif_counts[dif_counts > 0]
+        threshold = np.percentile(relevant,33)
+
+        print threshold
+
+        return threshold
 
     def __remove_noise__(self, error_profile):
         row_max, col_max = error_profile.shape
