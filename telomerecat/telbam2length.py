@@ -385,10 +385,11 @@ class MismatchingLociLogic(object):
 
 class VitalStatsFinder(object):
 
-    def __init__(self,temp_dir,total_procs,task_size):
+    def __init__(self,temp_dir,total_procs,task_size,trim_length=0):
         self.temp_dir = temp_dir
         self._total_procs = total_procs
         self._task_size = task_size
+        self._trim_length = trim_length
 
     def __csv_to_dict__(self,stats_path):
         insert_dat = np.genfromtxt(stats_path,delimiter=",",
@@ -433,6 +434,10 @@ class VitalStatsFinder(object):
         vital_stats_csv = self.__run_vital_rule__(sample_path)
         vital_stats = self.__csv_to_dict__(vital_stats_csv)
         vital_stats["phred_offset"] = vital_stats["min_qual"]
+        vital_stats["initial_read_len"] = vital_stats["read_len"]
+
+        if self._trim_length > 0:
+            vital_stats["read_len"] = self._trim_length 
  
         return vital_stats
 
@@ -846,7 +851,8 @@ class Telbam2Length(TelomerecatInterface):
 
         vital_stats_finder = VitalStatsFinder(self.temp_dir, 
                                         self.total_procs,
-                                        self.task_size)
+                                        self.task_size,
+                                        trim)
 
         for sample_path,sample_name, in izip(input_paths,names):
             sample_intro = "\t- %s | %s\n" % (sample_name, 
@@ -855,8 +861,6 @@ class Telbam2Length(TelomerecatInterface):
             self.__output__(sample_intro,2)
 
             vital_stats = vital_stats_finder.get_vital_stats(sample_path)
-            if trim > 0:
-                vital_stats["read_len"] = trim
 
             self.__check_vital_stats_insert_size__(inserts_path,
                                                     insert_length_generator,
@@ -948,7 +952,8 @@ class Telbam2Length(TelomerecatInterface):
 
     def __create_output_file__(self,output_csv_path):
         with open(output_csv_path,"w") as total:
-            header = "Sample,F1,F2,F4,Psi,Insert_mean,Insert_sd,Read_length\n"
+            header = ("Sample,F1,F2,F4,Psi,Insert_mean,Insert_sd,"
+                      "Read_length,Initial_read_length\n")
             total.write(header)
         return output_csv_path
 
@@ -958,7 +963,7 @@ class Telbam2Length(TelomerecatInterface):
                          output_csv_path,
                          name):
         with open(output_csv_path,"a") as counts:
-            counts.write("%s,%d,%d,%d,%.3f,%.3f,%.3f,%d\n" %\
+            counts.write("%s,%d,%d,%d,%.3f,%.3f,%.3f,%d,%d\n" %\
                 (name,
                 read_type_counts["F1"],
                 read_type_counts["F2"],
@@ -966,7 +971,8 @@ class Telbam2Length(TelomerecatInterface):
                 read_type_counts["sample_variance"],
                 vital_stats["insert_mean"],
                 vital_stats["insert_sd"],
-                vital_stats["read_len"]))
+                vital_stats["read_len"],
+                vital_stats["initial_read_len"]))
 
     def get_parser(self):
         parser = self.default_parser()
