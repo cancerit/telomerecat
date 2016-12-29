@@ -509,12 +509,16 @@ class ReadStatsFactory(object):
 
         read_array = self.__path_to_read_array__(read_stat_paths["read_array"])
 
-        error_profile, sample_variance = \
-                    self.__paths_to_error_profile__(read_stat_paths)
+
+        random_counts = pd.read_csv(read_stat_paths["random_counts"],
+                                    header=None).values 
+        mima_counts = pd.read_csv(read_stat_paths["mima_counts"],
+                                  header=None).values 
 
         read_counts = self.read_array_to_counts(read_array,
-                                                error_profile,
-                                                sample_variance)
+                                                mima_counts,
+                                                random_counts,
+                                                0)
 
         self.__delete_analysis_paths__(read_stat_paths)
         
@@ -529,7 +533,7 @@ class ReadStatsFactory(object):
                                     header=None).values 
         read_counts = pd.read_csv(read_stat_paths["mima_counts"],
                                   header=None).values 
-        error_profile = self.__array_to_profile__(read_counts, random_counts)
+
         sample_variance = self.__get_sample_variance__(read_counts)
         
         return error_profile, sample_variance
@@ -542,57 +546,31 @@ class ReadStatsFactory(object):
         read_variance = (read_counts[mask].std() / read_counts[mask].mean())
         return read_variance
 
-    def __array_to_profile__(self,read_counts,random_counts, thresh = None):
-        ten_percent = int(read_counts.shape[0] * .1)
+    def __array_to_profile__(self, dif_counts, thresh = None):
+        ten_percent = int(dif_counts.shape[0] * .1)
 
-        mask = np.ones(read_counts.shape)
-        mask[:,95:] = 0
-        mask[95:,:] = 0
+        mask = np.ones(dif_counts.shape)
+        mask[:,93:] = 0
+        mask[80:,:] = 0
         
-        dif_counts = (read_counts - random_counts) * mask
-        threshold = self.__get_threshold__(dif_counts)
+        dif_counts = dif_counts * mask
+
+        if thresh is None:
+            threshold = self.__get_threshold__(dif_counts)
+        else:
+            threshold = thresh
 
         error_profile = (dif_counts > threshold) * 1
         error_profile[:ten_percent,:] = 1
 
+        error_profile = self.__prune_error_profile__(error_profile)
+
         return error_profile
 
-        # ten_percent = int(read_counts.shape[0] * .1)
-
-        # if thresh is None:
-        #     mask = self.__get_exclusion_mask__(read_counts)
-        #     arg_max_index = (read_counts * mask).argmax()
-        #     dif_loci_x,dif_loci_y = np.unravel_index(arg_max_index,
-        #                                              dif_counts.shape)
-
-        #     hi_thresh = dif_counts[int(dif_loci_x-ten_percent):\
-        #                           int(dif_loci_x+ten_percent),
-        #                           dif_loci_y-15:\
-        #                           dif_loci_y+1]
-        #     hi_thresh = hi_thresh.flatten()
-
-        #     thresh = np.percentile(hi_thresh,95)
-
-        #     print thresh
-
-        # if self._debug_print:
-        #     print 'Thresh:',thresh
-
-        # error_profile = (dif_counts * (dif_counts > 0))\
-        #                          > thresh
-
-        # error_profile = self.__remove_noise__(error_profile)
-        # error_profile = self.__prune_error_profile__(error_profile)
-        # error_profile = self.__rationalise_error_profile__(error_profile)
-
-        # error_profile[:ten_percent,:] = 1
-
-    def __get_threshold__(self, dif_counts):
+    def __get_threshold__(self, dif_counts, percent):
         relevant = dif_counts[dif_counts > 0]
-        threshold = np.percentile(relevant,33)
-
-        print threshold
-
+        threshold = np.percentile(relevant, percent)
+        print threshold, percent
         return threshold
 
     def __remove_noise__(self, error_profile):
@@ -682,7 +660,24 @@ class ReadStatsFactory(object):
     def __path_to_read_array__(self,read_array_path):
         return pd.read_csv(read_array_path,header=None).values
 
-    def read_array_to_counts(self, read_array, error_profile, sample_variance):
+    def read_array_to_counts(self, read_array, 
+                                   mima_counts, 
+                                   random_counts, 
+                                   sample_variance):
+
+        dif_counts = mima_counts - random_counts
+        dif_counts = dif_counts * (1 * (dif_counts > 0))
+        max_thresh = dif_counts.max()
+
+        error_profile = self.__array_to_profile__(dif_counts, 0)
+        counts = self.__counts_for_error_profile__(read_array, 
+                                                   error_profile)
+        print counts
+
+        counts["sample_variance"] = 3
+        return counts
+
+    def __counts_for_error_profile__(self, read_array, error_profile):
         complete_reads,boundary_reads = \
                         self.__get_complete_status__(read_array,error_profile)
 
@@ -691,9 +686,7 @@ class ReadStatsFactory(object):
 
         return_dat = { "F2":int(f2_count),
                        "F1":int(f1_count),
-                       "F4":f4_count,
-                       "sample_variance":sample_variance}
-
+                       "F4":f4_count,}
         return return_dat
 
     def __get_f1_count__(self,complete_reads):
