@@ -534,8 +534,11 @@ class ReadStatsFactory(object):
         read_counts = pd.read_csv(read_stat_paths["mima_counts"],
                                   header=None).values 
 
-        sample_variance = self.__get_sample_variance__(read_counts)
+        sample_variance = 3
         
+        error_profile = self.__array_to_profile__(read_counts, 
+                                                  random_counts, 
+                                                  0)
         return error_profile, sample_variance
 
     def __get_sample_variance__(self, read_counts):
@@ -546,12 +549,16 @@ class ReadStatsFactory(object):
         read_variance = (read_counts[mask].std() / read_counts[mask].mean())
         return read_variance
 
-    def __array_to_profile__(self, dif_counts, thresh = None):
+    def __array_to_profile__(self, read_counts, random_counts, thresh = None):
+
+        dif_counts = read_counts - random_counts
+        dif_counts = dif_counts * (1 * (dif_counts > 0))
+
         ten_percent = int(dif_counts.shape[0] * .1)
 
         mask = np.ones(dif_counts.shape)
-        mask[:,93:] = 0
-        mask[80:,:] = 0
+        mask[:,98:] = 0
+        mask[75:,:] = 0
         
         dif_counts = dif_counts * mask
 
@@ -560,7 +567,7 @@ class ReadStatsFactory(object):
         else:
             threshold = thresh
 
-        error_profile = (dif_counts > threshold) * 1
+        error_profile = (dif_counts > 0) * 1
         error_profile[:ten_percent,:] = 1
 
         error_profile = self.__prune_error_profile__(error_profile)
@@ -665,11 +672,9 @@ class ReadStatsFactory(object):
                                    random_counts, 
                                    sample_variance):
 
-        dif_counts = mima_counts - random_counts
-        dif_counts = dif_counts * (1 * (dif_counts > 0))
-        max_thresh = dif_counts.max()
-
-        error_profile = self.__array_to_profile__(dif_counts, 0)
+        error_profile = self.__array_to_profile__(mima_counts, 
+                                                  random_counts, 
+                                                  0)
         counts = self.__counts_for_error_profile__(read_array, 
                                                    error_profile)
         print counts
