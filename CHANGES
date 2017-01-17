@@ -1,0 +1,6 @@
+2017/1/17 - Telomerecat v3.1 - jhrf
+
+- Added the ability to specify a read trim via the command line
+- Made the telbam2length estimation protocol more responsive to differing
+  read lengths (i.e removed magic numbers)
+- Fixed command line parameterisation bugs in csv2length and telbam2length
