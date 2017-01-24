@@ -565,8 +565,6 @@ class ReadStatsFactory(object):
 
             thresh = np.percentile(hi_thresh,95)
 
-            print thresh
-
         if self._debug_print:
             print 'Thresh:',thresh
 
