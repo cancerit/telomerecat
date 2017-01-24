@@ -1,3 +1,7 @@
+2017/1/24 - Telomerecat v3.1.1 - jhrf
+
+- Removed debug print message from telbam2length
+
 2017/1/17 - Telomerecat v3.1 - jhrf
 
 - Added the ability to specify a read trim via the command line
