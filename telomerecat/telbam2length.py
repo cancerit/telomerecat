@@ -514,8 +514,6 @@ class ReadStatsFactory(object):
         error_profile, sample_variance = \
                     self.__paths_to_error_profile__(read_stat_paths)
 
-        #error_profile = None
-
         read_counts = self.get_type_counts(path,
                                            vital_stats,
                                            error_profile)
@@ -534,9 +532,12 @@ class ReadStatsFactory(object):
                                     header=None).values 
         read_counts = pd.read_csv(read_stat_paths["mima_counts"],
                                   header=None).values 
-        error_profile = self.__array_to_profile__(read_counts, random_counts)
-        sample_variance = self.__get_sample_variance__(read_counts)
+
+        sample_variance = 3
         
+        error_profile = self.__array_to_profile__(read_counts, 
+                                                  random_counts, 
+                                                  0)
         return error_profile, sample_variance
 
     def __get_sample_variance__(self, read_counts):
@@ -574,6 +575,12 @@ class ReadStatsFactory(object):
         error_profile = self.__rationalise_error_profile__(error_profile)
 
         return error_profile
+
+    def __get_threshold__(self, dif_counts, percent):
+        relevant = dif_counts[dif_counts > 0]
+        threshold = np.percentile(relevant, percent)
+        print threshold, percent
+        return threshold
 
     def __remove_noise__(self, error_profile):
         row_max, col_max = error_profile.shape
@@ -718,8 +725,6 @@ class ReadStatsFactory(object):
             for locus in read.mima_loci:
                 qual_byte = ord(read.qual[locus]) - phred_offset
                 if error_profile[read.n_loci, qual_byte]:
-                    adjusted_mima_count -= 1
-
             return adjusted_mima_count < thresh
 
         def rule(reads, constants, master):
@@ -774,11 +779,12 @@ class ReadStatsFactory(object):
         phred_offset = vital_stats["phred_offset"]
 
         maxtrix_max = (vital_stats["max_qual"] - phred_offset)+1
-        matrix_shape = (vital_stats["read_len"]+1,maxtrix_max)
+        matrix_shape = (vital_stats["read_len"]+1,101)
 
-        def rule(reads, constants, master):
+    def rule(reads, constants, master):
             simple_reads = [simple_read_factory.get_simple_read(read) \
                                                          for read in reads]
+            
             random_counts = np.zeros(matrix_shape)
             mima_counts = np.zeros(matrix_shape)
 
@@ -795,7 +801,6 @@ class ReadStatsFactory(object):
                     
                     for b in qual_bytes:
                         random_counts[int(sample_size), b] += 1
-
             results = {"random_counts":random_counts,
                        "mima_counts":mima_counts}
 
