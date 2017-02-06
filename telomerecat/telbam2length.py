@@ -510,16 +510,19 @@ class ReadStatsFactory(object):
         self._trim = trim_reads
 
     def get_read_counts(self,path,vital_stats):
-        read_stat_paths = self.run_read_stat_rule(path, vital_stats)
-        error_profile, sample_variance = \
-                    self.__paths_to_error_profile__(read_stat_paths)
+        #read_stat_paths = self.run_read_stat_rule(path, vital_stats)
+        #error_profile, sample_variance = \
+        #            self.__paths_to_error_profile__(read_stat_paths)
 
+        error_profile = None
         read_counts = self.get_type_counts(path,
                                            vital_stats,
                                            error_profile)
 
+        print read_counts
+
         read_counts['sample_variance'] = 0
-        self.__delete_analysis_paths__(read_stat_paths)
+        #self.__delete_analysis_paths__(read_stat_paths)
         
         return read_counts
 
@@ -718,14 +721,20 @@ class ReadStatsFactory(object):
         simple_read_factory = SimpleReadFactory(vital_stats,
                                                 trim_reads=self._trim)
         phred_offset = vital_stats["phred_offset"]
-        thresh = (vital_stats["read_len"] * .1)
+        thresh = 5 #(vital_stats["read_len"] * .1)
+
+        max_phred = vital_stats["max_qual"] - vital_stats["phred_offset"]
+        qual_thresh = max_phred - ((max_phred) * .51)
 
         def is_complete(read):
             adjusted_mima_count = read.n_loci
             for locus in read.mima_loci:
                 qual_byte = ord(read.qual[locus]) - phred_offset
-                if error_profile[read.n_loci, qual_byte]:
-            return adjusted_mima_count < thresh
+                if qual_byte < qual_thresh:
+                    #is sequencing error
+                    adjusted_mima_count -= 1
+
+            return adjusted_mima_count <= thresh
 
         def rule(reads, constants, master):
             results = {}
@@ -781,7 +790,7 @@ class ReadStatsFactory(object):
         maxtrix_max = (vital_stats["max_qual"] - phred_offset)+1
         matrix_shape = (vital_stats["read_len"]+1,101)
 
-    def rule(reads, constants, master):
+        def rule(reads, constants, master):
             simple_reads = [simple_read_factory.get_simple_read(read) \
                                                          for read in reads]
             
@@ -918,9 +927,9 @@ class Telbam2Length(TelomerecatInterface):
                                        announce=False,
                                        cmd_run=False)
 
-        length_interface.run(input_paths=[temp_csv_path], 
-                             output_paths=[output_csv_path],
-                             correct_f2a=correct_f2a)
+        # length_interface.run(input_paths=[temp_csv_path], 
+        #                      output_paths=[output_csv_path],
+        #                      correct_f2a=correct_f2a)
 
         self.__print_output_information__(output_csv_path)
         self.__goodbye__()

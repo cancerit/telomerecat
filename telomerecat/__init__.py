@@ -10,5 +10,6 @@ import bam2telbam
 import bam2length
 import telbam2length
 import csv2length
+import error_estimator
 
 from _version import __version__

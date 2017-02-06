@@ -12,6 +12,7 @@ import gc
 import pdb
 
 import parabam
+import error_estimator
 
 import Queue as Queue2
 
@@ -31,11 +32,12 @@ from itertools import izip
 #them to the telbam
 def rule(reads, constants, master):
     tel_pats = constants["tel_pats"]
+    thresh = constants["thresh"]
     telomere_status = False
 
     for read in iter(reads):
         for pattern in tel_pats:
-            if pattern in read.seq:
+            if read.seq.count(pattern) > thresh:
                 telomere_status = True
                 break
 
@@ -90,10 +92,10 @@ class Bam2Telbam(parabam.core.Interface):
         self.__introduce__()
 
         subset_types=["telbam"]
-        tel_pats = ["TTAGGGTTAGGG","CCCTAACCCTAA"]
+        tel_pats = ["TTAGGG","CCCTAA"]
 
         #need to define my constants and engine here:
-        telbam_constants = {"thresh":1,
+        telbam_constants = {"thresh":2,
                             "tel_pats":tel_pats}
 
         final_output_paths = {}
@@ -118,6 +120,14 @@ class Bam2Telbam(parabam.core.Interface):
                                                 subsets=subset_types,
                                                 constants = telbam_constants,
                                                 rule = rule)
+
+            if self.verbose:
+                sys.stdout.write("\t- Adding error estimation to TELBAM header\n")
+
+            error_estimator.add_error_to_telbam_header(input_path, 
+                                                       telbam_paths[input_path]['telbam'], 
+                                                       self.temp_dir)
+
             if self.verbose:
                 sys.stdout.write("\t- TELBAM generation finished %s\n\n"\
                                      % (self.__get_date_time__(),))
