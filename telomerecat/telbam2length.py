@@ -4,6 +4,7 @@ import time
 import os
 import re
 import parabam
+import pysam
 import pdb
 
 import numpy as np
@@ -438,8 +439,31 @@ class VitalStatsFinder(object):
 
         if self._trim_length > 0:
             vital_stats["read_len"] = self._trim_length 
+
+        self.__add_error_terms__(sample_path, vital_stats)
  
         return vital_stats
+
+    def __add_error_terms__(self, sample_path, vital_stats):
+        telbam_file = pysam.AlignmentFile(sample_path, "rb")
+        header = telbam_file.header
+
+        error_ratio = -1
+        error_count = -1
+
+        if "CO" in header.keys():
+            for comment in header["CO"]:
+                if "telomerecat_error" in comment:
+                    name,data = comment.split(":")
+                    mean, median, std = [float(d) for d in data.split(",")]
+
+                    if "ratio" in comment:
+                        error_ratio = median
+                    elif "counts" in comment:
+                        error_count = median
+
+        vital_stats["base_error_ratio"] = error_ratio
+        vital_stats["coverage_over_5kb"]= error_count
 
     def __run_vital_rule__(self,sample_path,keep_in_temp=True):
         def rule(read,constants,master):
@@ -724,7 +748,9 @@ class ReadStatsFactory(object):
         thresh = 5 #(vital_stats["read_len"] * .1)
 
         max_phred = vital_stats["max_qual"] - vital_stats["phred_offset"]
-        qual_thresh = max_phred - ((max_phred) * .51)
+
+        error_factor = vital_stats["base_error_ratio"] / 100
+        qual_thresh = max_phred - ((max_phred) * error_factor)
 
         def is_complete(read):
             adjusted_mima_count = read.n_loci
@@ -927,9 +953,9 @@ class Telbam2Length(TelomerecatInterface):
                                        announce=False,
                                        cmd_run=False)
 
-        # length_interface.run(input_paths=[temp_csv_path], 
-        #                      output_paths=[output_csv_path],
-        #                      correct_f2a=correct_f2a)
+        length_interface.run(input_paths=[temp_csv_path], 
+                              output_paths=[output_csv_path],
+                              correct_f2a=correct_f2a)
 
         self.__print_output_information__(output_csv_path)
         self.__goodbye__()
