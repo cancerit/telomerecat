@@ -186,7 +186,7 @@ class Csv2Length(core.TelomerecatInterface):
     def run(self,input_paths,
                  output_paths = [],
                  correct_f2a = True,
-                 prior_weight = 3,
+                 prior_weight = 30000,
                  simulator_N = 10):
         
         self.__introduce__()
@@ -245,7 +245,6 @@ class Csv2Length(core.TelomerecatInterface):
     def __get_corrected_F2a__(self, counts, prior_weight = 3):
         theta_observed = counts["F2a"]/ (counts["F2"] + counts["F4"])
 
-        prior_weight = 3
         theta_expected = sum(theta_observed * counts["F2"]) / sum(counts["F2"])
 
         theta_corrected = ( (theta_observed * (counts["Psi"])) +\

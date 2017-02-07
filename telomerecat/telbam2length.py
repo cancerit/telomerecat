@@ -534,19 +534,21 @@ class ReadStatsFactory(object):
         self._trim = trim_reads
 
     def get_read_counts(self,path,vital_stats):
-        #read_stat_paths = self.run_read_stat_rule(path, vital_stats)
-        #error_profile, sample_variance = \
-        #            self.__paths_to_error_profile__(read_stat_paths)
+        read_stat_paths = self.run_read_stat_rule(path, vital_stats)
+        error_profile, sample_variance = \
+                   self.__paths_to_error_profile__(vital_stats, read_stat_paths)
 
-        error_profile = None
+        #error_profile = None
         read_counts = self.get_type_counts(path,
                                            vital_stats,
                                            error_profile)
 
         print read_counts
 
-        read_counts['sample_variance'] = 0
-        #self.__delete_analysis_paths__(read_stat_paths)
+        read_counts['sample_variance'] = vital_stats["coverage_over_5kb"] *\
+                                            vital_stats["base_error_ratio"]
+
+        self.__delete_analysis_paths__(read_stat_paths)
         
         return read_counts
 
@@ -554,7 +556,7 @@ class ReadStatsFactory(object):
         for analysis, path in read_stat_paths.items():
             os.remove(path)
 
-    def __paths_to_error_profile__(self,read_stat_paths):
+    def __paths_to_error_profile__(self,vital_stats,read_stat_paths):
         random_counts = pd.read_csv(read_stat_paths["random_counts"],
                                     header=None).values 
         read_counts = pd.read_csv(read_stat_paths["mima_counts"],
@@ -562,9 +564,9 @@ class ReadStatsFactory(object):
 
         sample_variance = 3
         
-        error_profile = self.__array_to_profile__(read_counts, 
-                                                  random_counts, 
-                                                  0)
+        error_profile = self.__array_to_profile__(vital_stats,
+                                                  read_counts, 
+                                                  random_counts)
         return error_profile, sample_variance
 
     def __get_sample_variance__(self, read_counts):
@@ -575,8 +577,8 @@ class ReadStatsFactory(object):
         read_variance = (read_counts[mask].std() / read_counts[mask].mean())
         return read_variance
 
-    def __array_to_profile__(self,read_counts,random_counts, thresh = None):
-        dif_counts = np.log2(read_counts+1) - np.log2(random_counts+1)
+    def __array_to_profile__(self, vital_stats, read_counts, random_counts, thresh = None):
+        dif_counts = np.log2(read_counts+0.00001) - np.log2(random_counts+0.00001)
 
         # if thresh is None:
         #     mask = self.__get_exclusion_mask__(read_counts)
@@ -595,13 +597,21 @@ class ReadStatsFactory(object):
         # if self._debug_print:
         #     print 'Thresh:',thresh
 
-        error_profile = dif_counts > .1
+        thresh = 25 * (vital_stats["base_error_ratio"] / 100)
+
+        error_profile = dif_counts > thresh
 
         error_profile = self.__remove_noise__(error_profile)
         error_profile = self.__prune_error_profile__(error_profile)
         error_profile = self.__rationalise_error_profile__(error_profile)
 
+        error_profile[:10,:] = True
+
         return error_profile
+
+    # def __optimal_thresh__(self, base_error_ratio, read_counts, dif_counts):
+    #     for x in np.arange(0,1000,5):
+    #         error_profile = self.__remove_noise__(dif_counts > x)
 
     def __get_threshold__(self, dif_counts, percent):
         relevant = dif_counts[dif_counts > 0]
@@ -753,14 +763,15 @@ class ReadStatsFactory(object):
         qual_thresh = max_phred - ((max_phred) * error_factor)
 
         def is_complete(read):
-            adjusted_mima_count = read.n_loci
-            for locus in read.mima_loci:
-                qual_byte = ord(read.qual[locus]) - phred_offset
-                if qual_byte < qual_thresh:
-                    #is sequencing error
-                    adjusted_mima_count -= 1
+            return error_profile[int(read.n_loci),int(read.avg_qual)]
+            # adjusted_mima_count = read.n_loci
+            # for locus in read.mima_loci:
+            #     qual_byte = ord(read.qual[locus]) - phred_offset
+            #     if qual_byte < qual_thresh:
+            #         #is sequencing error
+            #         adjusted_mima_count -= 1
 
-            return adjusted_mima_count <= thresh
+            # return adjusted_mima_count <= thresh
 
         def rule(reads, constants, master):
             results = {}
@@ -824,18 +835,16 @@ class ReadStatsFactory(object):
             mima_counts = np.zeros(matrix_shape)
 
             for read in simple_reads:
-                for locus in read.mima_loci:
-                    qual = ord(read.qual[locus]) - phred_offset
-                    mima_counts[read.n_loci, qual] += 1
+                mima_counts[read.n_loci, int(read.avg_qual)] += 1
 
                 #sample_size = int(np.random.uniform(1,80))
                 sample_size = len(read.mima_loci)
                 if sample_size > 0:
                     rand_quals  = np.random.choice(list(read.qual),sample_size)
                     qual_bytes  = [ord(q) - phred_offset for q in rand_quals]
-                    
-                    for b in qual_bytes:
-                        random_counts[int(sample_size), b] += 1
+
+                    random_counts[int(sample_size), int(np.mean(qual_bytes))] += 1
+
             results = {"random_counts":random_counts,
                        "mima_counts":mima_counts}
 
