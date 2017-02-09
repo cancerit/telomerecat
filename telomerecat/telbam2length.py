@@ -28,7 +28,7 @@ from telomerecat.core import TelomerecatInterface
 
 class SimpleReadFactory(object):
 
-    def __init__(self, vital_stats=None, trim_reads=0):
+    def __init__(self, vital_stats=None, thresh = 0,trim_reads=0):
         self._SimpleRead = namedtuple("SimpleRead","seq qual" +
                                       " five_prime pattern mima_loci n_loci"+
                                       " avg_qual")
@@ -39,6 +39,11 @@ class SimpleReadFactory(object):
         else:
             self._read_len = 100
             self._phred_offset = 33
+
+        if  thresh > 0:
+            self._thresh = int(float(self._read_len) / thresh)
+        else:
+            self._thresh = thresh
 
         self._trim_reads = trim_reads
         self._compliments = {"A":"T","T":"A",
@@ -60,6 +65,10 @@ class SimpleReadFactory(object):
                                                    mima_loci, 
                                                    frameshift_loci)
 
+        all_loci, avg_qual, n_loci = self.adjust_mima_for_thresh(all_loci, 
+                                                                qual, 
+                                                                n_loci)
+
         simple_read = self._SimpleRead(
             seq,
             qual,
@@ -70,6 +79,19 @@ class SimpleReadFactory(object):
             avg_qual)
 
         return simple_read
+
+    def adjust_mima_for_thresh(self, all_loci, qual, n_loci):
+
+        if self._thresh < n_loci:
+            locus_phred_tuples = [ (ord(qual[i])-self._phred_offset,i) \
+                                    for i in all_loci]
+            locus_phred_tuples.sort(key = lambda x : x[0])
+
+            phreds,loci = zip(*locus_phred_tuples[:n_loci-self._thresh])
+
+            return loci,int(np.mean(phreds)),len(phreds)
+        else:
+            return [],0,0
 
     def __get_phred_score__(self, qual, mima_loci, frameshift_loci):
         if len(mima_loci) + len(frameshift_loci) == 0:
@@ -546,7 +568,7 @@ class ReadStatsFactory(object):
         read_array = self.__path_to_read_array__(read_stat_paths["read_array"])
 
         error_profile, sample_variance = \
-                    self.__paths_to_error_profile__(read_stat_paths)
+                    self.__paths_to_error_profile__(vital_stats,read_stat_paths)
 
         read_counts = self.read_array_to_counts(read_array,
                                                 error_profile,
@@ -560,12 +582,14 @@ class ReadStatsFactory(object):
         for analysis, path in read_stat_paths.items():
             os.remove(path)
 
-    def __paths_to_error_profile__(self,read_stat_paths):
+    def __paths_to_error_profile__(self,vital_stats,read_stat_paths):
         random_counts = pd.read_csv(read_stat_paths["random_counts"],
                                     header=None).values 
         read_counts = pd.read_csv(read_stat_paths["mima_counts"],
                                   header=None).values 
-        error_profile = self.__array_to_profile__(read_counts, random_counts)
+        error_profile = self.__array_to_profile__(vital_stats, 
+                                                  read_counts, 
+                                                  random_counts)
         sample_variance = self.__get_sample_variance__(read_counts)
         
         return error_profile, sample_variance
@@ -578,36 +602,37 @@ class ReadStatsFactory(object):
         read_variance = (read_counts[mask].std() / read_counts[mask].mean())
         return read_variance
 
-    def __array_to_profile__(self,read_counts,random_counts, thresh = None):
+    def __array_to_profile__(self, vital_stats, read_counts,random_counts, thresh = None):
         dif_counts = read_counts - random_counts
-        ten_percent = int(read_counts.shape[0] * .1)
+        # ten_percent = int(read_counts.shape[0] * .1)
 
-        if thresh is None:
-            mask = self.__get_exclusion_mask__(read_counts)
-            arg_max_index = (read_counts * mask).argmax()
-            dif_loci_x,dif_loci_y = np.unravel_index(arg_max_index,
-                                                     dif_counts.shape)
+        # if thresh is None:
+        #     mask = self.__get_exclusion_mask__(read_counts)
+        #     arg_max_index = (read_counts * mask).argmax()
+        #     dif_loci_x,dif_loci_y = np.unravel_index(arg_max_index,
+        #                                              dif_counts.shape)
 
-            hi_thresh = dif_counts[int(dif_loci_x-ten_percent):\
-                                  int(dif_loci_x+ten_percent),
-                                  dif_loci_y-15:\
-                                  dif_loci_y+1]
-            hi_thresh = hi_thresh.flatten()
+        #     hi_thresh = dif_counts[int(dif_loci_x-ten_percent):\
+        #                           int(dif_loci_x+ten_percent),
+        #                           dif_loci_y-15:\
+        #                           dif_loci_y+1]
+        #     hi_thresh = hi_thresh.flatten()
 
-            thresh = np.percentile(hi_thresh,95)
+        #     thresh = np.percentile(hi_thresh,95)
 
-        if self._debug_print:
-            print 'Thresh:',thresh
+        # if self._debug_print:
+        #     print 'Thresh:',thresh
 
-        error_profile = (dif_counts * (dif_counts > 0))\
-                                 > thresh
+        thresh = np.mean(np.round(dif_counts[dif_counts>0])) \
+                    * (vital_stats["base_error_ratio"] / 100)
+
+        error_profile = dif_counts > thresh
 
         error_profile = self.__remove_noise__(error_profile)
         error_profile = self.__prune_error_profile__(error_profile)
         error_profile = self.__rationalise_error_profile__(error_profile)
 
-        error_profile[:ten_percent,:] = 1
-
+        error_profile[0,:] = 1
         return error_profile
 
     def __remove_noise__(self, error_profile):
@@ -626,10 +651,52 @@ class ReadStatsFactory(object):
         return mask
 
     def __prune_error_profile__(self, error_profile):
+        
+        isolated_mask = self.__get_isolated_mask__(error_profile)
+        continuous_mask = self.__get_continuous_mask__(error_profile)
+
+        combined_mask = ((isolated_mask + continuous_mask) > 0)
+
+        return error_profile * combined_mask
+
+    def __get_continuous_mask__(self, error_profile):
+        row_continuous = self.__transform_continous_matrix__(error_profile)
+        col_continuous = self.__transform_continous_matrix__(
+                                                    error_profile.transpose())
+        col_continuous = col_continuous.transpose()
+
+        max_continuous = row_continuous * (row_continuous > col_continuous)
+        max_continuous = max_continuous + \
+                        (col_continuous * (col_continuous >= row_continuous))
+
+        continusous_mask = max_continuous >= 4
+        return continusous_mask
+
+    def __transform_continous_matrix__(self, error_profile):
+        continuous = np.zeros(error_profile.shape)
+
+        for row_i in xrange(0,error_profile.shape[0]):
+            sequence = 0
+            start_index = -1
+            for col_i in xrange(0,error_profile.shape[1]):
+                value = error_profile[row_i, col_i]
+                if value == 0:
+                    if sequence > 0:
+                        continuous[row_i,start_index:col_i] = sequence
+                        sequence = 0
+                        start_index = -1
+                elif value > 0:
+                    if start_index == -1:
+                        start_index = col_i
+                    sequence += 1
+        return continuous
+
+    def __get_isolated_mask__(self, error_profile):
+        isolated_mask = np.ones(error_profile.shape)
         first_locis = self.__get_first_loci__(error_profile)
-        prune_mask = np.ones(error_profile.shape)
         for row_i in xrange(1,error_profile.shape[0]):
             if first_locis[row_i] == -1:
+                #skip rows with no entries
                 continue 
             else:
                 for col_i in xrange(error_profile.shape[1]):
@@ -637,8 +704,8 @@ class ReadStatsFactory(object):
                         col_i == 0:
                             continue
                     elif self.__prune_decision__(row_i,col_i,error_profile):
-                        prune_mask[row_i,col_i] = 0
-        return error_profile * prune_mask
+                        isolated_mask[row_i,col_i] = 0
+        return isolated_mask
 
     def __prune_decision__(self, row_i, col_i, error_profile):
         try:
@@ -753,35 +820,23 @@ class ReadStatsFactory(object):
                                 keep_in_temp=True):
 
         simple_read_factory = SimpleReadFactory(vital_stats,
+                                                thresh=0,
                                                 trim_reads=self._trim)
         phred_offset = vital_stats["phred_offset"]
 
         maxtrix_max = (vital_stats["max_qual"] - phred_offset)+1
         matrix_shape = (vital_stats["read_len"]+1,maxtrix_max)
 
-        def get_return_stats(reads,thresh):
+        def get_return_stats(reads):
 
-            return_stats = [len(reads[0].mima_loci),
+            return_stats = [reads[0].n_loci,
                             int(reads[0].five_prime),
-                            len(reads[1].mima_loci),
+                            reads[1].n_loci,
                             int(reads[1].five_prime),
                             reads[0].avg_qual,
                             reads[1].avg_qual]
 
             return return_stats
-
-        def adjust_mima_for_thresh(thresh, read):
-
-            if thresh < read.n_loci:
-                locus_phred_tuples = [ (ord(read.qual[i])-phred_offset,i) \
-                                        for i in read.mima_loci]
-                locus_phred_tuples.sort(key = lambda x : x[0])
-
-                phreds,loci = zip(*locus_phred_tuples[:read.n_loci-thresh])
-
-                return len(phreds),int(np.mean(phreds))
-            else:
-                return 0,0
 
         def rule(reads, constants, master):
             simple_reads = [simple_read_factory.get_simple_read(read) \
@@ -794,11 +849,8 @@ class ReadStatsFactory(object):
             mima_counts = np.zeros(matrix_shape)
 
             for read in simple_reads:
-                n_loci, avg_qual = adjust_mima_for_thresh(10, read)
-                mima_counts[n_loci,avg_qual] += 1
-
-                #sample_size = int(np.random.uniform(1,80))
-                sample_size = n_loci
+                mima_counts[read.n_loci,read.avg_qual] += 1
+                sample_size = read.n_loci
                 if sample_size > 0:
                     rand_quals  = np.random.choice(list(read.qual),sample_size)
                     qual_bytes  = [ord(q) - phred_offset for q in rand_quals]
