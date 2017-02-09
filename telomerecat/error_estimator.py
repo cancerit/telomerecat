@@ -317,8 +317,10 @@ def add_error_to_telbam_header(bam_path, telbam_path, temp_dir_path):
 
     #sequence.print_consensus_sequence()
     #sequence.print_base_segments(874)
-
     #sequence.get_error_breakdown()
+
+def print_diagnostics(bam_path):
+    read_counts, bad_base_ratios, insert_lengths = ScanBam().scan(bam_path)
 
 if __name__ == "__main__":
 

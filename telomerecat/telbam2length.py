@@ -601,11 +601,12 @@ class ReadStatsFactory(object):
 
         error_profile = dif_counts > thresh
 
-        error_profile = self.__remove_noise__(error_profile)
-        error_profile = self.__prune_error_profile__(error_profile)
-        error_profile = self.__rationalise_error_profile__(error_profile)
+        if error_profile.any():
+            error_profile = self.__remove_noise__(error_profile)
+            error_profile = self.__prune_error_profile__(error_profile)
+            error_profile = self.__rationalise_error_profile__(error_profile)
 
-        error_profile[:10,:] = True
+        error_profile[:15,:] = True
 
         return error_profile
 
