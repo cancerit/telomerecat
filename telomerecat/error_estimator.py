@@ -241,6 +241,7 @@ class ScanBam(object):
 
         bad_base_ratios = []
         read_counts = []
+        insert_lengths = []
 
         while sample_count < 300:
             chrm_name, chrm_len = random.sample(references, 1)[0]
@@ -263,6 +264,8 @@ class ScanBam(object):
                     unmapped = 0
                     for read in sequence.reads:
                         unmapped += int(read.is_unmapped)
+                        if read.is_proper_pair and read.mapq > 38 and read.is_read1:
+                            insert_lengths.append(abs(read.template_length))
 
                     error_bases = sequence.error_ratio()
 
@@ -270,7 +273,7 @@ class ScanBam(object):
                     bad_base_ratios.append(bad_base_ratio)
 
         bam_file.close()
-        return read_counts, bad_base_ratios
+        return read_counts, bad_base_ratios, insert_lengths
 
     def get_reads(self, bam_file, region):
         all_reads = []
@@ -308,24 +311,28 @@ def modify_telbam_header(telbam_path,
     os.rename(temp_telbam_path, telbam_path)
 
 def add_error_to_telbam_header(bam_path, telbam_path, temp_dir_path):
-    read_counts,bad_base_ratios = ScanBam().scan(bam_path)
+    read_counts,bad_base_ratios,insert_lengths = ScanBam().scan(bam_path)
 
     modify_telbam_header(telbam_path, 
                          read_counts, 
                          bad_base_ratios, 
                          temp_dir_path)
 
-    #sequence.print_consensus_sequence()
-    #sequence.print_base_segments(874)
-    #sequence.get_error_breakdown()
-
 def print_diagnostics(bam_path):
     read_counts, bad_base_ratios, insert_lengths = ScanBam().scan(bam_path)
+
+    print_list(read_counts)
+    print_list(bad_base_ratios)
+
+    print_list(insert_lengths)
+
+def print_list(for_print):
+    print np.mean(for_print), np.median(for_print), np.std(for_print)
 
 if __name__ == "__main__":
 
     if len(sys.argv) >= 2:
         for path in sys.argv[1:]:
-            add_error_to_telbam_header(path, None)
+            print_diagnostics(path)
     else:
         print "Useage:\n\terror_model.py <bam_paths...>"

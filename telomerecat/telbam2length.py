@@ -603,7 +603,9 @@ class ReadStatsFactory(object):
         return read_variance
 
     def __array_to_profile__(self, vital_stats, read_counts,random_counts, thresh = None):
-        dif_counts = read_counts - random_counts
+        dif_counts = np.log2(read_counts+0.0001) - np.log2(random_counts+0.0001)
+        dif_counts[0,0] = 0
+
         # ten_percent = int(read_counts.shape[0] * .1)
 
         # if thresh is None:
@@ -623,16 +625,21 @@ class ReadStatsFactory(object):
         # if self._debug_print:
         #     print 'Thresh:',thresh
 
-        thresh = np.mean(np.round(dif_counts[dif_counts>0])) \
-                    * (vital_stats["base_error_ratio"] / 100)
+        thresh = np.percentile(read_counts[read_counts>0],99) *\
+                 (vital_stats["base_error_ratio"] / 100)
 
-        error_profile = dif_counts > thresh
+        # error_profile = dif_counts > 50000
+        # print thresh
+
+        error_profile = read_counts > thresh
 
         error_profile = self.__remove_noise__(error_profile)
         error_profile = self.__prune_error_profile__(error_profile)
-        error_profile = self.__rationalise_error_profile__(error_profile)
+        #error_profile = self.__rationalise_error_profile__(error_profile)
 
+        
         error_profile[0,:] = 1
+
         return error_profile
 
     def __remove_noise__(self, error_profile):
@@ -820,7 +827,7 @@ class ReadStatsFactory(object):
                                 keep_in_temp=True):
 
         simple_read_factory = SimpleReadFactory(vital_stats,
-                                                thresh=0,
+                                                thresh=10,
                                                 trim_reads=self._trim)
         phred_offset = vital_stats["phred_offset"]
 
@@ -965,6 +972,10 @@ class Telbam2Length(TelomerecatInterface):
                                                        vital_stats,
                                                        self.total_procs,
                                                        trim)
+
+            f2a = read_type_counts["F2"] - read_type_counts["F4"]
+            length = (float(read_type_counts["F1"]) / f2a) * vital_stats["insert_mean"]
+            print "F1:%d,F2a:%d,L:%d" % (read_type_counts["F1"],f2a,length,)
 
             self.__write_to_csv__(read_type_counts,
                                     vital_stats,
