@@ -186,7 +186,7 @@ class Csv2Length(core.TelomerecatInterface):
     def run(self,input_paths,
                  output_paths = [],
                  correct_f2a = True,
-                 prior_weight = 30000,
+                 prior_weight = 3,
                  simulator_N = 10):
         
         self.__introduce__()

@@ -603,42 +603,33 @@ class ReadStatsFactory(object):
         return read_variance
 
     def __array_to_profile__(self, vital_stats, read_counts,random_counts, thresh = None):
-        dif_counts = np.log2(read_counts+0.0001) - np.log2(random_counts+0.0001)
-        dif_counts[0,0] = 0
+        dif_counts = read_counts - random_counts
+        ten_percent = int(read_counts.shape[0] * .1)
 
-        # ten_percent = int(read_counts.shape[0] * .1)
+        if thresh is None:
+            mask = self.__get_exclusion_mask__(read_counts)
+            arg_max_index = (read_counts * mask).argmax()
+            dif_loci_x,dif_loci_y = np.unravel_index(arg_max_index,
+                                                     dif_counts.shape)
 
-        # if thresh is None:
-        #     mask = self.__get_exclusion_mask__(read_counts)
-        #     arg_max_index = (read_counts * mask).argmax()
-        #     dif_loci_x,dif_loci_y = np.unravel_index(arg_max_index,
-        #                                              dif_counts.shape)
+            hi_thresh = dif_counts[int(dif_loci_x-ten_percent):\
+                                  int(dif_loci_x+ten_percent),
+                                  dif_loci_y-15:\
+                                  dif_loci_y+1]
+            hi_thresh = hi_thresh.flatten()
 
-        #     hi_thresh = dif_counts[int(dif_loci_x-ten_percent):\
-        #                           int(dif_loci_x+ten_percent),
-        #                           dif_loci_y-15:\
-        #                           dif_loci_y+1]
-        #     hi_thresh = hi_thresh.flatten()
+            thresh = np.percentile(hi_thresh,95)
 
-        #     thresh = np.percentile(hi_thresh,95)
+        if self._debug_print:
+            print 'Thresh:',thresh
 
-        # if self._debug_print:
-        #     print 'Thresh:',thresh
-
-        thresh = np.percentile(read_counts[read_counts>0],99) *\
-                 (vital_stats["base_error_ratio"] / 100)
-
-        # error_profile = dif_counts > 50000
-        # print thresh
-
-        error_profile = read_counts > thresh
+        print thresh
+        error_profile = dif_counts > thresh
 
         error_profile = self.__remove_noise__(error_profile)
         error_profile = self.__prune_error_profile__(error_profile)
-        #error_profile = self.__rationalise_error_profile__(error_profile)
-
-        
-        error_profile[0,:] = 1
+        error_profile = self.__rationalise_error_profile__(error_profile)
+        error_profile[0:ten_percent,:] = True
 
         return error_profile
 
@@ -834,12 +825,14 @@ class ReadStatsFactory(object):
         maxtrix_max = (vital_stats["max_qual"] - phred_offset)+1
         matrix_shape = (vital_stats["read_len"]+1,maxtrix_max)
 
-        def get_return_stats(reads):
+        def get_return_stats(reads,gc):
 
             return_stats = [reads[0].n_loci,
                             int(reads[0].five_prime),
                             reads[1].n_loci,
                             int(reads[1].five_prime),
+                            gc,
+                            gc,
                             reads[0].avg_qual,
                             reads[1].avg_qual]
 
@@ -848,30 +841,42 @@ class ReadStatsFactory(object):
         def rule(reads, constants, master):
             simple_reads = [simple_read_factory.get_simple_read(read) \
                                                          for read in reads]
-            return_dat = np.zeros((2,6))
-            return_dat[0,:] = get_return_stats(simple_reads)
-            return_dat[1,:] = get_return_stats(simple_reads[::-1])
+            return_dat = np.zeros((2,8))
 
-            random_counts = np.zeros(matrix_shape)
-            mima_counts = np.zeros(matrix_shape)
+            base_counts = Counter("".join([r.seq for r in reads]))
 
-            for read in simple_reads:
-                mima_counts[read.n_loci,read.avg_qual] += 1
-                sample_size = read.n_loci
-                if sample_size > 0:
-                    rand_quals  = np.random.choice(list(read.qual),sample_size)
-                    qual_bytes  = [ord(q) - phred_offset for q in rand_quals]
-                    rand_avg = np.mean(qual_bytes)
+            if base_counts["N"] < 30:
 
-                    random_counts[int(sample_size),int(rand_avg)] += 1
+                gc_count = float(base_counts["G"]+base_counts["C"])
+                ta_count = float(base_counts["T"]+base_counts["A"])
 
-            results = {"read_array":np.array(return_dat),
-                      "random_counts":random_counts,
-                      "mima_counts":mima_counts}
+                gc_perc = gc_count / (ta_count+gc_count)
+
+                return_dat[0,:] = get_return_stats(simple_reads, gc_perc)
+                return_dat[1,:] = get_return_stats(simple_reads[::-1], gc_perc)
+
+                random_counts = np.zeros(matrix_shape)
+                mima_counts = np.zeros(matrix_shape)
+
+                for read in simple_reads:
+                    mima_counts[read.n_loci,read.avg_qual] += 1
+                    sample_size = read.n_loci
+                    if sample_size > 0:
+                        rand_quals  = np.random.choice(list(read.qual),sample_size)
+                        qual_bytes  = [ord(q) - phred_offset for q in rand_quals]
+                        rand_avg = np.mean(qual_bytes)
+
+                        random_counts[int(sample_size),int(rand_avg)] += 1
+
+                results = {"read_array":np.array(return_dat),
+                          "random_counts":random_counts,
+                          "mima_counts":mima_counts}
+            else:
+                results = {}
 
             return results
 
-        structures = {"read_array":{"data":np.zeros((2,6)),
+        structures = {"read_array":{"data":np.zeros((2,8)),
                                     "store_method":"vstack"},
                      "mima_counts":{"data":np.zeros(matrix_shape),
                                     "store_method":"cumu"},
