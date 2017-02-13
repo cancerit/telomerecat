@@ -93,8 +93,6 @@ class SimpleReadFactory(object):
             new_avg_qual = int(np.mean(phreds))
             new_n_loci = len(phreds)
 
-        print self._allow, new_n_loci, n_loci
-
         return new_loci, new_avg_qual, new_n_loci
 
     def __get_phred_score__(self, qual, mima_loci, frameshift_loci):
