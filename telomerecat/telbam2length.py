@@ -633,7 +633,7 @@ class ReadStatsFactory(object):
         error_profile = self.__remove_noise__(error_profile)
         error_profile = self.__prune_error_profile__(error_profile)
         error_profile = self.__rationalise_error_profile__(error_profile)
-        error_profile[0:ten_percent,:] = True
+        #error_profile[0:ten_percent,:] = True
 
         return error_profile
 
