@@ -28,7 +28,7 @@ from telomerecat.core import TelomerecatInterface
 
 class SimpleReadFactory(object):
 
-    def __init__(self, vital_stats=None, thresh = 0,trim_reads=0):
+    def __init__(self, vital_stats=None, allow = 0,trim_reads=0):
         self._SimpleRead = namedtuple("SimpleRead","seq qual" +
                                       " five_prime pattern mima_loci n_loci"+
                                       " avg_qual")
@@ -40,11 +40,8 @@ class SimpleReadFactory(object):
             self._read_len = 100
             self._phred_offset = 33
 
-        if  thresh > 0:
-            self._thresh = int(float(self._read_len) / thresh)
-        else:
-            self._thresh = thresh
-
+        self._allow = (int(allow / float(self._read_len)) * 100)
+        
         self._trim_reads = trim_reads
         self._compliments = {"A":"T","T":"A",
                              "C":"G","G":"C",
@@ -553,6 +550,7 @@ class ReadStatsFactory(object):
                       total_procs=4,
                       task_size = 5000,
                       trim_reads = 0,
+                      allow=0,
                       debug_print=False):
 
         self.temp_dir = temp_dir
@@ -561,6 +559,7 @@ class ReadStatsFactory(object):
 
         self._debug_print = debug_print
         self._trim = trim_reads
+        self._allow = allow
 
     def get_read_counts(self,path,vital_stats):
         read_stat_paths = self.run_read_stat_rule(path, vital_stats)
@@ -818,7 +817,7 @@ class ReadStatsFactory(object):
                                 keep_in_temp=True):
 
         simple_read_factory = SimpleReadFactory(vital_stats,
-                                                thresh=10,
+                                                allow=self._allow,
                                                 trim_reads=self._trim)
         phred_offset = vital_stats["phred_offset"]
 
@@ -922,12 +921,14 @@ class Telbam2Length(TelomerecatInterface):
     def run_cmd(self):
         self.run(input_paths = self.cmd_args.input,
                  trim = self.cmd_args.trim,
+                 allow=self.cmd_args.allow,
                  inserts_path = self.cmd_args.insert,
                  correct_f2a = not self.cmd_args.disable_correction,
                  output_path = self.cmd_args.output)
 
     def run(self,input_paths,
                  trim = 0,
+                 allow=0,
                  output_path = None,
                  correct_f2a = True,
                  inserts_path = None):
@@ -976,7 +977,8 @@ class Telbam2Length(TelomerecatInterface):
             read_type_counts = self.__get_read_types__(sample_path,
                                                        vital_stats,
                                                        self.total_procs,
-                                                       trim)
+                                                       trim,
+                                                       allow)
 
             f2a = read_type_counts["F2"] - read_type_counts["F4"]
             length = (float(read_type_counts["F1"]) / f2a) * vital_stats["insert_mean"]
@@ -1033,12 +1035,14 @@ class Telbam2Length(TelomerecatInterface):
                                 vital_stats,
                                 total_procs,
                                 trim,
+                                allow,
                                 read_stats_factory=None):
 
         if read_stats_factory is None:
             read_stats_factory = ReadStatsFactory(temp_dir=self.temp_dir,
                                                   total_procs=total_procs,
                                                   trim_reads=trim,
+                                                  allow=allow,
                                                   debug_print=False)
             
         read_type_counts = read_stats_factory.get_read_counts(sample_path,
@@ -1116,7 +1120,12 @@ class Telbam2Length(TelomerecatInterface):
         parser.add_argument('-s',type=int, nargs='?', default=10000
             ,help="The amount of reads considered by each\n"
                     "distributed task. [Default: 10000]")
-        parser.add_argument('-t',"--trim", type=int, nargs='?', default=0
+        parser.add_argument('-a','--allow',metavar="PERCENT",
+                            type=int, nargs='?', default=0
+            ,help="A threshold on the `genuine` mismatches to allow\n"
+                  "in each seqeuncing read. Expressed as a percentage of\n"
+                  "read total [Default: 0]")
+        parser.add_argument('-t',"--trim", type=int, metavar="INT",nargs='?', default=0
             ,help="Use only the amount of sequence specified by this  \n"
                   "option (i.e if the value 90 is supplied\n"
                   "then only the first 90 bases are\n"
