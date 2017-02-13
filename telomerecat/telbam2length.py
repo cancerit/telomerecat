@@ -40,8 +40,8 @@ class SimpleReadFactory(object):
             self._read_len = 100
             self._phred_offset = 33
 
-        self._allow = (int(allow / float(self._read_len)) * 100)
-        
+        self._allow = int((allow / float(self._read_len)) * 100)
+
         self._trim_reads = trim_reads
         self._compliments = {"A":"T","T":"A",
                              "C":"G","G":"C",
@@ -79,16 +79,23 @@ class SimpleReadFactory(object):
 
     def adjust_mima_for_thresh(self, all_loci, qual, n_loci):
 
-        if self._thresh < n_loci:
+        new_loci = []
+        new_avg_qual = 0
+        new_n_loci = 0
+
+        if self._allow < n_loci:
             locus_phred_tuples = [ (ord(qual[i])-self._phred_offset,i) \
                                     for i in all_loci]
             locus_phred_tuples.sort(key = lambda x : x[0])
 
-            phreds,loci = zip(*locus_phred_tuples[:n_loci-self._thresh])
+            phreds,new_loci = zip(*locus_phred_tuples[:n_loci-self._allow])
 
-            return loci,int(np.mean(phreds)),len(phreds)
-        else:
-            return [],0,0
+            new_avg_qual = int(np.mean(phreds))
+            new_n_loci = len(phreds)
+
+        print self._allow, new_n_loci, n_loci
+
+        return new_loci, new_avg_qual, new_n_loci
 
     def __get_phred_score__(self, qual, mima_loci, frameshift_loci):
         if len(mima_loci) + len(frameshift_loci) == 0:
@@ -921,14 +928,14 @@ class Telbam2Length(TelomerecatInterface):
     def run_cmd(self):
         self.run(input_paths = self.cmd_args.input,
                  trim = self.cmd_args.trim,
-                 allow=self.cmd_args.allow,
+                 allow = self.cmd_args.allow,
                  inserts_path = self.cmd_args.insert,
                  correct_f2a = not self.cmd_args.disable_correction,
                  output_path = self.cmd_args.output)
 
     def run(self,input_paths,
                  trim = 0,
-                 allow=0,
+                 allow = 0,
                  output_path = None,
                  correct_f2a = True,
                  inserts_path = None):
@@ -1044,7 +1051,7 @@ class Telbam2Length(TelomerecatInterface):
                                                   trim_reads=trim,
                                                   allow=allow,
                                                   debug_print=False)
-            
+
         read_type_counts = read_stats_factory.get_read_counts(sample_path,
                                                               vital_stats)
         return read_type_counts 
