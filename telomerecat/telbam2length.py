@@ -54,7 +54,9 @@ class SimpleReadFactory(object):
         if self._trim_reads > 0:
             seq,qual = (seq[:self._trim_reads],
                         qual[:self._trim_reads])
+        return self.sequence_to_simpleread(seq,qual)
 
+    def sequence_to_simpleread(self, seq, qual):
         (mima_loci,frameshift_loci),pattern = \
                 self.mima_logic.get_telo_mismatch(seq)
 
@@ -860,7 +862,10 @@ class ReadStatsFactory(object):
                 return_dat[1,:] = get_return_stats(simple_reads[::-1], gc_perc)
 
                 random_counts = np.zeros(matrix_shape)
+                #base_null = np.zeros(matrix_shape)
                 mima_counts = np.zeros(matrix_shape)
+
+                bases = ["A","C","T","G"]
 
                 for read in simple_reads:
                     mima_counts[read.n_loci,read.avg_qual] += 1
@@ -872,9 +877,18 @@ class ReadStatsFactory(object):
 
                         random_counts[int(sample_size),int(rand_avg)] += 1
 
+                    # rand_seq = "".join(np.random.choice(bases,
+                    #                                     len(read.seq),
+                    #                                     replace=True).tolist())
+                    # rand_read =  \
+                    #     simple_read_factory.sequence_to_simpleread(rand_seq,
+                    #                                                read.qual)
+                    # base_null[rand_read.n_loci, rand_read.avg_qual]+=1
+
                 results = {"read_array":np.array(return_dat),
                           "random_counts":random_counts,
                           "mima_counts":mima_counts}
+                          #"base_null":base_null}
             else:
                 results = {}
 
@@ -886,6 +900,8 @@ class ReadStatsFactory(object):
                                     "store_method":"cumu"},
                      "random_counts":{"data":np.zeros(matrix_shape),
                                     "store_method":"cumu"},}
+                     #"base_null":{"data":np.zeros(matrix_shape),
+                                    #"store_method":"cumu"},}
 
         stat_interface = parabam.Stat(temp_dir=self.temp_dir,
                                       pair_process=True,
