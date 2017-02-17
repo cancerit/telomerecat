@@ -500,6 +500,7 @@ class ReadStatsFactory(object):
                       total_procs=4,
                       task_size = 5000,
                       trim_reads = 0,
+                      allow = 0,
                       debug_print=False):
 
         self.temp_dir = temp_dir
@@ -508,6 +509,8 @@ class ReadStatsFactory(object):
 
         self._debug_print = debug_print
         self._trim = trim_reads
+
+        self._allow_percent = allow
 
     def get_read_counts(self,path,vital_stats):
         read_stat_paths = self.run_read_stat_rule(path, vital_stats)
@@ -547,9 +550,10 @@ class ReadStatsFactory(object):
         read_variance = (read_counts[mask].std() / read_counts[mask].mean())
         return read_variance
 
-    def __array_to_profile__(self,read_counts,random_counts, thresh = None):
+    def __array_to_profile__(self, read_counts,random_counts, thresh = None):
         dif_counts = read_counts - random_counts
-        ten_percent = int(read_counts.shape[0] * .1)
+        read_len = read_counts.shape[0]
+        ten_percent = int(read_len * .1)
 
         if thresh is None:
             mask = self.__get_exclusion_mask__(read_counts)
@@ -575,8 +579,9 @@ class ReadStatsFactory(object):
         error_profile = self.__prune_error_profile__(error_profile)
         error_profile = self.__rationalise_error_profile__(error_profile)
 
-        error_profile[:ten_percent,:] = 1
+        allow = int(float(read_len / 100) * self._allow_percent)
 
+        error_profile[:allow,:] = True
         return error_profile
 
     def __remove_noise__(self, error_profile):
@@ -594,11 +599,54 @@ class ReadStatsFactory(object):
         mask[x_start:,y_start:] = 1
         return mask
 
+
     def __prune_error_profile__(self, error_profile):
+        
+        isolated_mask = self.__get_isolated_mask__(error_profile)
+        continuous_mask = self.__get_continuous_mask__(error_profile)
+
+        combined_mask = ((isolated_mask + continuous_mask) > 0)
+
+        return error_profile * combined_mask
+
+    def __get_continuous_mask__(self, error_profile):
+        row_continuous = self.__transform_continous_matrix__(error_profile)
+        col_continuous = self.__transform_continous_matrix__(
+                                                    error_profile.transpose())
+        col_continuous = col_continuous.transpose()
+
+        max_continuous = row_continuous * (row_continuous > col_continuous)
+        max_continuous = max_continuous + \
+                        (col_continuous * (col_continuous >= row_continuous))
+
+        continusous_mask = max_continuous >= 4
+        return continusous_mask
+
+    def __transform_continous_matrix__(self, error_profile):
+        continuous = np.zeros(error_profile.shape)
+
+        for row_i in xrange(0,error_profile.shape[0]):
+            sequence = 0
+            start_index = -1
+            for col_i in xrange(0,error_profile.shape[1]):
+                value = error_profile[row_i, col_i]
+                if value == 0:
+                    if sequence > 0:
+                        continuous[row_i,start_index:col_i] = sequence
+                        sequence = 0
+                        start_index = -1
+                elif value > 0:
+                    if start_index == -1:
+                        start_index = col_i
+                    sequence += 1
+        return continuous
+
+    def __get_isolated_mask__(self, error_profile):
+        isolated_mask = np.ones(error_profile.shape)
         first_locis = self.__get_first_loci__(error_profile)
-        prune_mask = np.ones(error_profile.shape)
         for row_i in xrange(1,error_profile.shape[0]):
             if first_locis[row_i] == -1:
+                #skip rows with no entries
                 continue 
             else:
                 for col_i in xrange(error_profile.shape[1]):
@@ -606,8 +654,8 @@ class ReadStatsFactory(object):
                         col_i == 0:
                             continue
                     elif self.__prune_decision__(row_i,col_i,error_profile):
-                        prune_mask[row_i,col_i] = 0
-        return error_profile * prune_mask
+                        isolated_mask[row_i,col_i] = 0
+        return isolated_mask
 
     def __prune_decision__(self, row_i, col_i, error_profile):
         try:
@@ -642,18 +690,19 @@ class ReadStatsFactory(object):
         return first_loci
 
     def __rationalise_error_profile__(self, error_profile):
-        start_row = np.where(error_profile)[0].max()
-        global_loci = 0
-        for i in reversed(xrange(0,start_row+1)):
-            error_bins_in_row = np.where(error_profile[i,:])[0]
-            if len(error_bins_in_row) > 0:
-                cur_loci = error_bins_in_row.max()
-            else:
-                cur_loci = 0
+        if error_profile.sum() > 0:
+            start_row = np.where(error_profile)[0].max()
+            global_loci = 0
+            for i in reversed(xrange(0,start_row+1)):
+                error_bins_in_row = np.where(error_profile[i,:])[0]
+                if len(error_bins_in_row) > 0:
+                    cur_loci = error_bins_in_row.max()
+                else:
+                    cur_loci = 0
 
-            #if cur_loci > global_loci:
-            global_loci = cur_loci
-            error_profile[i,:global_loci+1] = True
+                #if cur_loci > global_loci:
+                global_loci = cur_loci
+                error_profile[i,:global_loci+1] = True
         
         return error_profile
 
@@ -813,12 +862,14 @@ class Telbam2Length(TelomerecatInterface):
     def run_cmd(self):
         self.run(input_paths = self.cmd_args.input,
                  trim = self.cmd_args.trim,
+                 allow = self.cmd_args.allow,
                  inserts_path = self.cmd_args.insert,
                  correct_f2a = not self.cmd_args.disable_correction,
                  output_path = self.cmd_args.output)
 
     def run(self,input_paths,
                  trim = 0,
+                 allow = 0,
                  output_path = None,
                  correct_f2a = True,
                  inserts_path = None):
@@ -867,6 +918,7 @@ class Telbam2Length(TelomerecatInterface):
             read_type_counts = self.__get_read_types__(sample_path,
                                                        vital_stats,
                                                        self.total_procs,
+                                                       allow,
                                                        trim)
 
             self.__write_to_csv__(read_type_counts,
@@ -919,6 +971,7 @@ class Telbam2Length(TelomerecatInterface):
     def __get_read_types__(self,sample_path,
                                 vital_stats,
                                 total_procs,
+                                allow,
                                 trim,
                                 read_stats_factory=None):
 
@@ -926,6 +979,7 @@ class Telbam2Length(TelomerecatInterface):
             read_stats_factory = ReadStatsFactory(temp_dir=self.temp_dir,
                                                   total_procs=total_procs,
                                                   trim_reads=trim,
+                                                  allow=allow,
                                                   debug_print=False)
             
         read_type_counts = read_stats_factory.get_read_counts(sample_path,
@@ -1003,6 +1057,11 @@ class Telbam2Length(TelomerecatInterface):
         parser.add_argument('-s',type=int, nargs='?', default=10000
             ,help="The amount of reads considered by each\n"
                     "distributed task. [Default: 10000]")
+        parser.add_argument('-a','--allow',metavar="PERCENT",
+                            type=int, nargs='?', default=5
+            ,help="A threshold on the `genuine` mismatches to allow\n"
+                  "in each seqeuncing read. Expressed as a percentage of\n"
+                  "read total [Default: 0]")
         parser.add_argument('-t',"--trim", type=int, nargs='?', default=0
             ,help="Use only the amount of sequence specified by this  \n"
                   "option (i.e if the value 90 is supplied\n"
