@@ -635,6 +635,7 @@ class ReadStatsFactory(object):
         error_profile = self.__remove_noise__(error_profile)
         error_profile = self.__prune_error_profile__(error_profile)
         error_profile = self.__rationalise_error_profile__(error_profile)
+        error_profile[0,0] = True
         #error_profile[0:ten_percent,:] = True
 
         return error_profile
@@ -642,8 +643,8 @@ class ReadStatsFactory(object):
     def __remove_noise__(self, error_profile):
         row_max, col_max = error_profile.shape
         error_profile[int(row_max*.11):,int(col_max*.7):] = 0
-        error_profile[int(row_max*.35):,0] = 0
-        error_profile[int(row_max*.55):,:] = 0 
+        error_profile[int(row_max*.35)-self._allow:,0] = 0
+        error_profile[int(row_max*.60)-self._allow:,:] = 0 
 
         return error_profile
 
@@ -744,18 +745,19 @@ class ReadStatsFactory(object):
         return first_loci
 
     def __rationalise_error_profile__(self, error_profile):
-        start_row = np.where(error_profile)[0].max()
-        global_loci = 0
-        for i in reversed(xrange(0,start_row+1)):
-            error_bins_in_row = np.where(error_profile[i,:])[0]
-            if len(error_bins_in_row) > 0:
-                cur_loci = error_bins_in_row.max()
-            else:
-                cur_loci = 0
+        if error_profile.sum() > 0:
+            start_row = np.where(error_profile)[0].max()
+            global_loci = 0
+            for i in reversed(xrange(0,start_row+1)):
+                error_bins_in_row = np.where(error_profile[i,:])[0]
+                if len(error_bins_in_row) > 0:
+                    cur_loci = error_bins_in_row.max()
+                else:
+                    cur_loci = 0
 
-            #if cur_loci > global_loci:
-            global_loci = cur_loci
-            error_profile[i,:global_loci+1] = True
+                #if cur_loci > global_loci:
+                global_loci = cur_loci
+                error_profile[i,:global_loci+1] = True
         
         return error_profile
 
@@ -1142,7 +1144,7 @@ class Telbam2Length(TelomerecatInterface):
             ,help="The amount of reads considered by each\n"
                     "distributed task. [Default: 10000]")
         parser.add_argument('-a','--allow',metavar="PERCENT",
-                            type=int, nargs='?', default=0
+                            type=int, nargs='?', default=5
             ,help="A threshold on the `genuine` mismatches to allow\n"
                   "in each seqeuncing read. Expressed as a percentage of\n"
                   "read total [Default: 0]")
