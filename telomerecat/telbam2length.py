@@ -60,6 +60,7 @@ class SimpleReadFactory(object):
         (mima_loci,frameshift_loci),pattern = \
                 self.mima_logic.get_telo_mismatch(seq)
 
+
         all_loci, avg_qual,n_loci = self.__get_phred_score__(qual, 
                                                    mima_loci, 
                                                    frameshift_loci)
@@ -82,20 +83,26 @@ class SimpleReadFactory(object):
     def adjust_mima_for_thresh(self, all_loci, qual, n_loci):
 
         new_loci = []
-        new_avg_qual = 0
+        new_phreds = []
         new_n_loci = 0
 
-        if self._allow < n_loci:
-            locus_phred_tuples = [ (ord(qual[i])-self._phred_offset,i) \
-                                    for i in all_loci]
-            locus_phred_tuples.sort(key = lambda x : x[0])
+        qual_bytes = [ord(b) - self._phred_offset for b in qual]
+        read_qual_mean = np.mean(qual_bytes)
+        read_qual_std = np.std(qual_bytes)
 
-            phreds,new_loci = zip(*locus_phred_tuples[:n_loci-self._allow])
+        for i in all_loci:
 
-            new_avg_qual = int(np.mean(phreds))
-            new_n_loci = len(phreds)
+            if qual_bytes[i] > (read_qual_mean - read_qual_std):
+                new_n_loci+=1
+                new_loci.append(i)
+                new_phreds.append(qual_bytes[i])
 
-        return new_loci, new_avg_qual, new_n_loci
+        if new_n_loci == 0:
+            new_phreds_mean = 0
+        else:
+            new_phreds_mean = np.mean(new_phreds)
+
+        return new_loci, int(new_phreds_mean), new_n_loci
 
     def __get_phred_score__(self, qual, mima_loci, frameshift_loci):
         if len(mima_loci) + len(frameshift_loci) == 0:
@@ -774,6 +781,14 @@ class ReadStatsFactory(object):
         complete_reads,boundary_reads = \
                         self.__get_complete_status__(read_array,error_profile)
 
+
+
+        counts = Counter(read_array[:,0])
+        count_arr = [str(counts[x]) for x in np.arange(0,150,1.0)]
+        print "c("+",".join(count_arr)+")"
+
+        pdb.set_trace()
+
         f2_count,f4_count = self.__get_boundary_counts__(boundary_reads)
         f1_count = self.__get_f1_count__(complete_reads)
 
@@ -870,8 +885,10 @@ class ReadStatsFactory(object):
                 bases = ["A","C","T","G"]
 
                 for read in simple_reads:
+
                     mima_counts[read.n_loci,read.avg_qual] += 1
                     sample_size = read.n_loci
+
                     if sample_size > 0:
                         rand_quals  = np.random.choice(list(read.qual),sample_size)
                         qual_bytes  = [ord(q) - phred_offset for q in rand_quals]
@@ -886,6 +903,15 @@ class ReadStatsFactory(object):
                     #     simple_read_factory.sequence_to_simpleread(rand_seq,
                     #                                                read.qual)
                     # base_null[rand_read.n_loci, rand_read.avg_qual]+=1
+
+
+                is_range = [r.n_loci > 0 and r.n_loci < 15 for r in simple_reads]
+                if any(is_range):
+                    for read in simple_reads:
+                        simple_read_factory.mima_logic.print_mima(read.seq, read.qual, read.pattern)
+
+                    print "------"
+                    time.sleep(np.random.randint(0,5))
 
                 results = {"read_array":np.array(return_dat),
                           "random_counts":random_counts,
