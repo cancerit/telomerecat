@@ -26,30 +26,23 @@ from telomerecat.core import TelomerecatInterface
 ##
 ######################################################################
 
-class SimpleReadFactory(object):
+class TeloReadFactory(object):
 
-    def __init__(self, vital_stats=None, allow = 0,trim_reads=0):
-        self._SimpleRead = namedtuple("SimpleRead","seq qual" +
+    def __init__(self, allow = 0, trim_reads=0):
+        self._TeloRead = namedtuple("SimpleRead","seq qual" +
                                       " five_prime pattern mima_loci n_loci"+
                                       " avg_qual")
 
-        if vital_stats:
-            self._read_len = vital_stats["read_len"]
-            self._phred_offset = vital_stats["phred_offset"]
-        else:
-            self._read_len = 100
-            self._phred_offset = 33
-
-        self._allow = int((allow / float(self._read_len)) * 100)
-
+        self._allow = allow
         self._trim_reads = trim_reads
+
         self._compliments = {"A":"T","T":"A",
                              "C":"G","G":"C",
                              "N":"N"}
 
         self.mima_logic = MismatchingLociLogic()
 
-    def get_simple_read(self,read):
+    def get_telo_read(self,read):
         seq,qual = self.__flip_and_compliment__(read)
         if self._trim_reads > 0:
             seq,qual = (seq[:self._trim_reads],
@@ -69,7 +62,7 @@ class SimpleReadFactory(object):
                                                                 qual, 
                                                                 n_loci)
 
-        simple_read = self._SimpleRead(
+        simple_read = self._TeloRead(
             seq,
             qual,
             self.__get_five_prime__(pattern),
@@ -86,7 +79,7 @@ class SimpleReadFactory(object):
         new_phreds = []
         new_n_loci = 0
 
-        qual_bytes = [ord(b) - self._phred_offset for b in qual]
+        qual_bytes = [ord(b) for b in qual]
         read_qual_mean = np.mean(qual_bytes)
         read_qual_std = np.std(qual_bytes)
 
@@ -118,7 +111,7 @@ class SimpleReadFactory(object):
             for i in xrange(start,end):
                 if i in mima_loci:
                     remove_mimas.append(i)
-                fuse_phreds.append( (i,ord(qual[i])-self._phred_offset) )
+                fuse_phreds.append( (i,ord(qual[i])) )
 
             min_loci, min_phred = min(fuse_phreds,key=lambda x : x[1])
 
@@ -127,7 +120,7 @@ class SimpleReadFactory(object):
 
         for locus in mima_loci:
             if locus not in remove_mimas:
-                phreds.append(ord(qual[locus])-self._phred_offset)
+                phreds.append(ord(qual[locus]))
                 all_loci.append(locus)
 
         all_loci.sort()
@@ -137,26 +130,8 @@ class SimpleReadFactory(object):
     def __get_average_qual__(self,qual,mima_loci):
         if len(mima_loci) == 0:
             return 0
-        phreds = np.array([ord(qual[i])-self._phred_offset for i in mima_loci])
+        phreds = np.array([ord(qual[i]) for i in mima_loci])
         return np.mean(phreds)
-
-    def __trim_seq__(self,seq,qual):
-        cutoff = 0
-        min_sequence = 0
-        for q in qual:
-            qual_byte = ord(q) - self._phred_offset
-            if qual_byte == 0:
-                min_sequence += 1
-            else:
-                min_sequence = 0
-            
-            if min_sequence == 5:
-                cutoff = cutoff - 5
-                break
-
-            cutoff += 1
-
-        return seq[:cutoff],qual[:cutoff]
 
     def __get_five_prime__(self,pattern):
         if pattern is None:
@@ -424,7 +399,7 @@ class MismatchingLociLogic(object):
 
         return "".join(loci_status), mima_loci, fuse_loci
 
-class VitalStatsFinder(object):
+class SampleStatsFinder(object):
 
     def __init__(self,temp_dir,total_procs,task_size,trim_length=0):
         self.temp_dir = temp_dir
@@ -432,123 +407,96 @@ class VitalStatsFinder(object):
         self._task_size = task_size
         self._trim_length = trim_length
 
-    def __csv_to_dict__(self,stats_path):
-        insert_dat = np.genfromtxt(stats_path,delimiter=",",
-                                names=True,dtype=("S256",float,float,
-                                                         float,float,
-                                                         float,float,
-                                                         float,float,
-                                                         float))
+    def get_sample_stats(self,sample_path):
 
-        ins_N = int(insert_dat['N'])
-        if ins_N == 0:
-            insert_mean = -1
-            insert_sd = -1
-        else:
-            ins_sum = int(insert_dat['sum'])
-            ins_power_2 = int(insert_dat['power_2'])
+        read_stats_csv_path = self.__run_read_stat_rule__(sample_path)
+        sample_stats = self.csv_to_sample_stats(read_stats_csv_path)
 
-            insert_mean,insert_sd = \
-                        self.__get_mean_and_sd__(ins_sum, ins_power_2, ins_N)
-    
-        min_qual = int(insert_dat['min_qual'])
-        qual_mean,qual_sd = self.__get_mean_and_sd__(insert_dat["qual_sum"],
-                                                    insert_dat["qual_power_2"],
-                                                    insert_dat["qual_N"])
+        return sample_stats
 
-        return {"insert_mean":insert_mean, 
-                "insert_sd": insert_sd,
-                "min_qual":min_qual,
-                "max_qual":int(insert_dat['max_qual']),
-                "read_len":int(insert_dat['read_len']),
-                "qual_mean":qual_mean,
-                "qual_sd":qual_sd}
+    def csv_to_sample_stats(self, read_stats_csv_path):
+        read_stats = pd.read_csv(read_stats_csv_path).values
 
-    def __get_mean_and_sd__(self,x_sum,x_power_2,x_N):
-        x_mean = x_sum / x_N
-        x_sd = np.sqrt( (x_N * x_power_2) - x_sum**2) / x_N
+        sample_stats = {}
+        self.__load_insert_dat__(sample_stats, read_stats)
+        sample_stats["read_len"] = round(read_stats[:,8].mean(),1)
+        sample_stats["initial_read_len"] = round(read_stats[:,9].mean(),1)
+        sample_stats["min_phred"] = int(read_stats[:,6].min())
+        sample_stats["max_phred"] = int(read_stats[:,7].min())
 
-        return x_mean,x_sd
+        sample_stats["read_stats_path"] = read_stats_csv_path
 
-    def get_vital_stats(self,sample_path):
+        return sample_stats
 
-        vital_stats_csv = self.__run_vital_rule__(sample_path)
-        vital_stats = self.__csv_to_dict__(vital_stats_csv)
-        vital_stats["phred_offset"] = vital_stats["min_qual"]
-        vital_stats["initial_read_len"] = vital_stats["read_len"]
+    def __load_insert_dat__(self, sample_stats, read_stats):
+        relevant_mask = np.arange(read_stats.shape[0]) % 2 == 0
+        insert_stats = read_stats[relevant_mask,:]
 
-        if self._trim_length > 0:
-            vital_stats["read_len"] = self._trim_length 
- 
-        self.__add_error_terms__(sample_path, vital_stats)
- 
-        return vital_stats
+        proper_pair_mask = read_stats[:,3] == 1
+        insert_stats = read_stats[proper_pair_mask,:]
+        
+        well_map_thresh = np.percentile(insert_stats[:,4],66)
+        well_map_mask = insert_stats[:,4] >= well_map_thresh
 
-    def __add_error_terms__(self, sample_path, vital_stats):
-        telbam_file = pysam.AlignmentFile(sample_path, "rb")
-        header = telbam_file.header
+        well_mapped_reads = insert_stats[well_map_mask,:]
 
-        error_ratio = -1
-        error_count = -1
+        sample_stats["insert_mean"] = round(well_mapped_reads[:,5].mean(),3)
+        sample_stats["insert_std"] = round(well_mapped_reads[:,5].std(),3)
 
-        if "CO" in header.keys():
-            for comment in header["CO"]:
-                if "telomerecat_error" in comment:
-                    name,data = comment.split(":")
-                    mean, median, std = [float(d) for d in data.split(",")]
+    def __run_read_stat_rule__(self,sample_path,keep_in_temp=True):
 
-                    if "ratio" in comment:
-                        error_ratio = median
-                    elif "counts" in comment:
-                        error_count = median
+        telo_read_factory = TeloReadFactory()#allow=self._allow,
+                                            #trim_reads=self._trim)
 
-        vital_stats["base_error_ratio"] = error_ratio
-        vital_stats["coverage_over_5kb"]= error_count
 
-    def __run_vital_rule__(self,sample_path,keep_in_temp=True):
-        def rule(read,constants,master):
-            stats = {}
+        def prepare_stats(telo_read, read):
+            qual_bytes = [ord(q) for q in telo_read.qual]
 
-            hash_count = read.qual.count("#")
-            if read.is_read1 and read.is_proper_pair and read.mapq > 38:
-                insert_size = abs(read.template_length)
-                stats["sum"] = insert_size
-                stats["power_2"] = insert_size**2
-                stats["N"] = 1
-            
-            stats["read_len"] =  len(read.seq)
-            byte_vals = map(ord,read.qual)
-            min_qual = min(byte_vals)
-            max_qual = max(byte_vals)
-
-            qual_mean = np.mean(byte_vals)
-            stats["qual_sum"] = qual_mean
-            stats["qual_power_2"] = qual_mean**2
-            stats["qual_N"] = 1
-
-            stats["min_qual"] = min_qual
-            stats["max_qual"] = max_qual
+            stats = (telo_read.n_loci,
+                     int(telo_read.five_prime),
+                     telo_read.avg_qual,
+                     int(read.is_proper_pair),
+                     read.mapq,
+                     abs(read.template_length),
+                     min(qual_bytes),
+                     max(qual_bytes),
+                     len(telo_read.seq),
+                     len(read.seq))
 
             return stats
 
-        structures = {}
+        def get_read_entries(reads):
+            telo_reads = \
+                [telo_read_factory.get_telo_read(read) for read in reads]
 
-        structures["sum"] = {"data":0,"store_method":"cumu"}
-        structures["power_2"] = {"data":0,"store_method":"cumu"}
-        structures["N"] = {"data":0,"store_method":"cumu"}
-        structures["read_len"] = {"data":0,"store_method":"max"}
+            read_1_stats = prepare_stats(telo_reads[0],reads[0])
+            read_2_stats = prepare_stats(telo_reads[1],reads[1])
 
-        structures["min_qual"] = {"data":999,"store_method":"min"}
-        structures["max_qual"] = {"data":0,"store_method":"max"}
+            read_1_entry = list(read_1_stats)
+            read_1_entry.extend(read_2_stats)
+
+            read_2_entry = list(read_2_stats)
+            read_2_entry.extend(read_1_stats)
+
+            return_dat = np.zeros((2,len(read_1_entry)))
+
+            return_dat[0,:] = read_1_entry
+            return_dat[1,:] = read_2_entry
+
+            return return_dat
 
 
-        structures["qual_sum"] = {"data":0,"store_method":"cumu"}
-        structures["qual_power_2"] = {"data":0,"store_method":"cumu"}    
-        structures["qual_N"] = {"data":0,"store_method":"cumu"}  
+        def rule(reads, constants, master):
+            stats = {"read_stats":get_read_entries(reads)}
+            return stats
+
+        structures = {"read_stats":{"data":np.zeros((2,20)),
+                                    "store_method":"vstack"}}
 
         stat_interface = parabam.Stat(temp_dir=self.temp_dir,
                                       total_procs = self._total_procs,
-                                      task_size = 10000,
+                                      task_size = 7000,
+                                      pair_process = True,
                                       keep_in_temp=keep_in_temp)
 
         out_paths = stat_interface.run(input_paths= [sample_path],
@@ -556,7 +504,7 @@ class VitalStatsFinder(object):
                                        rule = rule,
                                        struc_blueprint = structures)
 
-        return out_paths["global"]["stats"]
+        return out_paths[sample_path]["read_stats"]
 
 class ReadStatsFactory(object):
 
@@ -575,207 +523,60 @@ class ReadStatsFactory(object):
         self._trim = trim_reads
         self._allow = allow
 
-    def get_read_counts(self,path,vital_stats):
-        read_stat_paths = self.run_read_stat_rule(path, vital_stats)
+    def get_read_counts(self,path,sample_stats):
+        read_stats = self.__path_to_read_array__(sample_stats["read_stats_path"])
+        self.__model_counts__(read_stats, sample_stats)
 
-        read_array = self.__path_to_read_array__(read_stat_paths["read_array"])
-
-        error_profile, sample_variance = \
-                    self.__paths_to_error_profile__(vital_stats,read_stat_paths)
-
-        read_counts = self.read_array_to_counts(read_array,
-                                                error_profile,
-                                                sample_variance)
-
-        self.__delete_analysis_paths__(read_stat_paths)
+        #self.__delete_analysis_paths__(read_stats_path)
         
         return read_counts
+
+    def __model_counts__(self, read_stats, sample_stats):
+
+        converged = False
+
+        total_reads = read_stats.shape[0]
+
+        observed_data = read_stats[:,0]
+        observed_dist = self.__dist_from_data__(observed_data, 
+                                                sample_stats["read_len"])
+
+        telo_N = observed_dist[:10].sum()
+        subtelo_N = observed_dist[10:30].sum()
+        nontelo_N = observed_dist[30:].sum()
+
+        telo_lambda = 2
+
+        subtelo_mu = 20
+        subtelo_sigma = 5
+
+        nontelo_mu = 60
+        nontelo_sigma = 5
+
+        while not converged:
+            telo_reads = np.random.exponential(telo_lambda,size=telo_N)
+            subtelo_reads = np.random.normal(subtelo_mu,subtelo_sigma,subtelo_N)
+            nontelo_reads = np.random.normal(nontelo_mu,nontelo_sigma,nontelo_N)
+
+            sim_data = np.concatenate((telo_reads, 
+                                       subtelo_reads, 
+                                       nontelo_reads))
+
+            sim_dist = self.__dist_from_data__(sim_data, 
+                                               sample_stats["read_len"])
+            pdb.set_trace()
+
+    def __dist_from_data__(self, data, read_len):
+        dist = np.histogram(data,bins = int(data.max()) )[0]
+        dist_buffer = [0] * int(read_len - len(dist))
+        return np.concatenate((dist, dist_buffer))
 
     def __delete_analysis_paths__(self, read_stat_paths):
         for analysis, path in read_stat_paths.items():
             os.remove(path)
 
-    def __paths_to_error_profile__(self,vital_stats,read_stat_paths):
-        random_counts = pd.read_csv(read_stat_paths["random_counts"],
-                                    header=None).values 
-        read_counts = pd.read_csv(read_stat_paths["mima_counts"],
-                                  header=None).values 
-        error_profile = self.__array_to_profile__(vital_stats, 
-                                                  read_counts, 
-                                                  random_counts)
-        sample_variance = self.__get_sample_variance__(read_counts)
-        
-        return error_profile, sample_variance
-
-    def __get_sample_variance__(self, read_counts):
-        read_counts[0,:] = 0
-        mask = read_counts > 0
-        mask[40:,:] = False
-
-        read_variance = (read_counts[mask].std() / read_counts[mask].mean())
-        return read_variance
-
-    def __array_to_profile__(self, vital_stats, read_counts,random_counts, thresh = None):
-        dif_counts = read_counts - random_counts
-        ten_percent = int(read_counts.shape[0] * .1)
-
-        if thresh is None:
-            mask = self.__get_exclusion_mask__(read_counts)
-            arg_max_index = (read_counts * mask).argmax()
-            dif_loci_x,dif_loci_y = np.unravel_index(arg_max_index,
-                                                     dif_counts.shape)
-
-            hi_thresh = dif_counts[int(dif_loci_x-ten_percent):\
-                                  int(dif_loci_x+ten_percent),
-                                  dif_loci_y-15:\
-                                  dif_loci_y+1]
-            hi_thresh = hi_thresh.flatten()
-
-            thresh = np.percentile(hi_thresh,95)
-
-        if self._debug_print:
-            print 'Thresh:',thresh
-
-        print thresh
-        error_profile = dif_counts > thresh
-
-        error_profile = self.__remove_noise__(error_profile)
-        error_profile = self.__prune_error_profile__(error_profile)
-        error_profile = self.__rationalise_error_profile__(error_profile)
-        error_profile[0,0] = True
-        #error_profile[0:ten_percent,:] = True
-
-        return error_profile
-
-    def __remove_noise__(self, error_profile):
-        row_max, col_max = error_profile.shape
-        error_profile[int(row_max*.11):,int(col_max*.7):] = 0
-        error_profile[int(row_max*.35)-self._allow:,0] = 0
-        error_profile[int(row_max*.60)-self._allow:,:] = 0 
-
-        return error_profile
-
-    def __get_exclusion_mask__(self, read_counts):
-        mask = np.zeros(read_counts.shape)
-        x_start = int(read_counts.shape[0] * .2)
-        y_start = int(read_counts.shape[1] * .5)
-        mask[x_start:,y_start:] = 1
-        return mask
-
-    def __prune_error_profile__(self, error_profile):
-        
-        isolated_mask = self.__get_isolated_mask__(error_profile)
-        continuous_mask = self.__get_continuous_mask__(error_profile)
-
-        combined_mask = ((isolated_mask + continuous_mask) > 0)
-
-        return error_profile * combined_mask
-
-    def __get_continuous_mask__(self, error_profile):
-        row_continuous = self.__transform_continous_matrix__(error_profile)
-        col_continuous = self.__transform_continous_matrix__(
-                                                    error_profile.transpose())
-        col_continuous = col_continuous.transpose()
-
-        max_continuous = row_continuous * (row_continuous > col_continuous)
-        max_continuous = max_continuous + \
-                        (col_continuous * (col_continuous >= row_continuous))
-
-        continusous_mask = max_continuous >= 4
-        return continusous_mask
-
-    def __transform_continous_matrix__(self, error_profile):
-        continuous = np.zeros(error_profile.shape)
-
-        for row_i in xrange(0,error_profile.shape[0]):
-            sequence = 0
-            start_index = -1
-            for col_i in xrange(0,error_profile.shape[1]):
-                value = error_profile[row_i, col_i]
-                if value == 0:
-                    if sequence > 0:
-                        continuous[row_i,start_index:col_i] = sequence
-                        sequence = 0
-                        start_index = -1
-                elif value > 0:
-                    if start_index == -1:
-                        start_index = col_i
-                    sequence += 1
-        return continuous
-
-    def __get_isolated_mask__(self, error_profile):
-        isolated_mask = np.ones(error_profile.shape)
-        first_locis = self.__get_first_loci__(error_profile)
-        for row_i in xrange(1,error_profile.shape[0]):
-            if first_locis[row_i] == -1:
-                #skip rows with no entries
-                continue 
-            else:
-                for col_i in xrange(error_profile.shape[1]):
-                    if (not error_profile[row_i,col_i]) or \
-                        col_i == 0:
-                            continue
-                    elif self.__prune_decision__(row_i,col_i,error_profile):
-                        isolated_mask[row_i,col_i] = 0
-        return isolated_mask
-
-    def __prune_decision__(self, row_i, col_i, error_profile):
-        try:
-            return self.__get_neighbor_sum__(row_i,col_i,error_profile) < 4
-        except IndexError:
-            return False
-
-    def __get_neighbor_sum__(self,row_i, col_i, error_profile):
-
-        neighbours = [(row_i-1,col_i+1),
-                      (row_i-1,col_i),
-                      (row_i-1,col_i-1),
-                      (row_i,col_i+1),
-                      (row_i,col_i-1),
-                      (row_i+1,col_i+1),
-                      (row_i+1,col_i),
-                      (row_i+1,col_i-1),]
-
-        neighbours_sum = sum([ error_profile[r,c] for (r,c) in neighbours])
-        return neighbours_sum
-
-    def __get_first_loci__(self,error_profile):
-        first_loci = []
-        for row_i in xrange(error_profile.shape[0]):
-            if any(error_profile[row_i,:]):
-                for col_i in xrange(error_profile.shape[1]):
-                    if error_profile[row_i,col_i]:
-                        first_loci.append(col_i)
-                        break
-            else:
-                first_loci.append(-1)
-        return first_loci
-
-    def __rationalise_error_profile__(self, error_profile):
-        if error_profile.sum() > 0:
-            start_row = np.where(error_profile)[0].max()
-            global_loci = 0
-            for i in reversed(xrange(0,start_row+1)):
-                error_bins_in_row = np.where(error_profile[i,:])[0]
-                if len(error_bins_in_row) > 0:
-                    cur_loci = error_bins_in_row.max()
-                else:
-                    cur_loci = 0
-
-                #if cur_loci > global_loci:
-                global_loci = cur_loci
-                error_profile[i,:global_loci+1] = True
-        
-        return error_profile
-
-    def __array_to_file__(self,array,unique):
-        df = pd.DataFrame(array)
-        out_path = "./%s-tmctout.csv" % (unique)
-        df.to_csv(out_path,index=False,header=False)
-        return out_path
-
-    def __path_to_read_array__(self,read_array_path):
-        return pd.read_csv(read_array_path,header=None).values
+    def __path_to_read_array__(self,read_stats_path):
+        return pd.read_csv(read_stats_path,header=None).values
 
     def read_array_to_counts(self, read_array, error_profile, sample_variance):
         complete_reads,boundary_reads = \
@@ -835,116 +636,6 @@ class ReadStatsFactory(object):
 
         return read_array[complete_indicies,:],\
                 read_array[boundary_indicies,:]
-
-    def run_read_stat_rule(self,path,
-                                vital_stats,
-                                keep_in_temp=True):
-
-        simple_read_factory = SimpleReadFactory(vital_stats,
-                                                allow=self._allow,
-                                                trim_reads=self._trim)
-        phred_offset = vital_stats["phred_offset"]
-
-        maxtrix_max = (vital_stats["max_qual"] - phred_offset)+1
-        matrix_shape = (vital_stats["read_len"]+1,maxtrix_max)
-
-        def get_return_stats(reads,gc):
-
-            return_stats = [reads[0].n_loci,
-                            int(reads[0].five_prime),
-                            reads[1].n_loci,
-                            int(reads[1].five_prime),
-                            gc,
-                            gc,
-                            reads[0].avg_qual,
-                            reads[1].avg_qual]
-
-            return return_stats
-
-        def rule(reads, constants, master):
-            simple_reads = [simple_read_factory.get_simple_read(read) \
-                                                         for read in reads]
-            return_dat = np.zeros((2,8))
-
-            base_counts = Counter("".join([r.seq for r in reads]))
-
-            if base_counts["N"] < 30:
-
-                gc_count = float(base_counts["G"]+base_counts["C"])
-                ta_count = float(base_counts["T"]+base_counts["A"])
-
-                gc_perc = gc_count / (ta_count+gc_count)
-
-                return_dat[0,:] = get_return_stats(simple_reads, gc_perc)
-                return_dat[1,:] = get_return_stats(simple_reads[::-1], gc_perc)
-
-                random_counts = np.zeros(matrix_shape)
-                #base_null = np.zeros(matrix_shape)
-                mima_counts = np.zeros(matrix_shape)
-
-                bases = ["A","C","T","G"]
-
-                for read in simple_reads:
-
-                    mima_counts[read.n_loci,read.avg_qual] += 1
-                    sample_size = read.n_loci
-
-                    if sample_size > 0:
-                        rand_quals  = np.random.choice(list(read.qual),sample_size)
-                        qual_bytes  = [ord(q) - phred_offset for q in rand_quals]
-                        rand_avg = np.mean(qual_bytes)
-
-                        random_counts[int(sample_size),int(rand_avg)] += 1
-
-                    # rand_seq = "".join(np.random.choice(bases,
-                    #                                     len(read.seq),
-                    #                                     replace=True).tolist())
-                    # rand_read =  \
-                    #     simple_read_factory.sequence_to_simpleread(rand_seq,
-                    #                                                read.qual)
-                    # base_null[rand_read.n_loci, rand_read.avg_qual]+=1
-
-
-                is_range = [r.n_loci > 0 and r.n_loci < 15 for r in simple_reads]
-                if any(is_range):
-                    for read in simple_reads:
-                        simple_read_factory.mima_logic.print_mima(read.seq, read.qual, read.pattern)
-
-                    print "------"
-                    time.sleep(np.random.randint(0,5))
-
-                results = {"read_array":np.array(return_dat),
-                          "random_counts":random_counts,
-                          "mima_counts":mima_counts}
-                          #"base_null":base_null}
-            else:
-                results = {}
-
-            return results
-
-        structures = {"read_array":{"data":np.zeros((2,8)),
-                                    "store_method":"vstack"},
-                     "mima_counts":{"data":np.zeros(matrix_shape),
-                                    "store_method":"cumu"},
-                     "random_counts":{"data":np.zeros(matrix_shape),
-                                    "store_method":"cumu"},}
-                     #"base_null":{"data":np.zeros(matrix_shape),
-                                    #"store_method":"cumu"},}
-
-        stat_interface = parabam.Stat(temp_dir=self.temp_dir,
-                                      pair_process=True,
-                                      total_procs = self._total_procs,
-                                      task_size = self._task_size,
-                                      keep_in_temp = keep_in_temp,
-                                      verbose=0)
-
-        out_paths = stat_interface.run(
-            input_paths = [path],
-            constants = {},
-            rule = rule,
-            struc_blueprint = structures)
-
-        return out_paths[path]
 
 class Telbam2Length(TelomerecatInterface):
 
@@ -1006,7 +697,7 @@ class Telbam2Length(TelomerecatInterface):
         self.__output__(" Collecting meta-data for all samples | %s\n" \
                             % (self.__get_date_time__(),),1)
 
-        vital_stats_finder = VitalStatsFinder(self.temp_dir, 
+        sample_stats_finder = SampleStatsFinder(self.temp_dir, 
                                         self.total_procs,
                                         self.task_size,
                                         trim)
@@ -1017,14 +708,10 @@ class Telbam2Length(TelomerecatInterface):
 
             self.__output__(sample_intro,2)
 
-            vital_stats = vital_stats_finder.get_vital_stats(sample_path)
-
-            self.__check_vital_stats_insert_size__(inserts_path,
-                                                    insert_length_generator,
-                                                    vital_stats)
+            sample_stats = sample_stats_finder.get_sample_stats(sample_path)
 
             read_type_counts = self.__get_read_types__(sample_path,
-                                                       vital_stats,
+                                                       sample_stats,
                                                        self.total_procs,
                                                        trim,
                                                        allow)
@@ -1065,37 +752,21 @@ class Telbam2Length(TelomerecatInterface):
                 for line in inserts_file:
                     yield map(float,line.split(","))
 
-    def __check_vital_stats_insert_size__(self,inserts_path,
-                                        insert_length_generator,vital_stats):
-        if inserts_path:
-            insert_mean,insert_sd = insert_length_generator.next()
-            vital_stats["insert_mean"] = insert_mean
-            vital_stats["insert_sd"] = insert_sd
-            self.__output__("\t\t+ Using user defined insert size: %d,%d\n" \
-                                                    % (insert_mean,insert_sd),2)
-        elif vital_stats["insert_mean"] == -1:
-            default_mean,default_sd = 350,25
-            vital_stats["insert_mean"] = 350
-            vital_stats["insert_sd"] = 25
-            self.__output__("\t\t+ Failed to estimate insert size. Using default: %d,%d\n"\
-                                                % (default_mean,default_sd),2)
-
     def __get_read_types__(self,sample_path,
-                                vital_stats,
+                                sample_stats,
                                 total_procs,
                                 trim,
-                                allow,
-                                read_stats_factory=None):
+                                allow):
 
-        if read_stats_factory is None:
-            read_stats_factory = ReadStatsFactory(temp_dir=self.temp_dir,
-                                                  total_procs=total_procs,
-                                                  trim_reads=trim,
-                                                  allow=allow,
-                                                  debug_print=False)
+
+        read_stats_factory = ReadStatsFactory(temp_dir=self.temp_dir,
+                                              total_procs=total_procs,
+                                              trim_reads=trim,
+                                              allow=allow,
+                                              debug_print=False)
 
         read_type_counts = read_stats_factory.get_read_counts(sample_path,
-                                                              vital_stats)
+                                                              sample_stats)
         return read_type_counts 
 
     def __get_temp_path__(self):
