@@ -17,7 +17,7 @@ from pprint import pprint
 
 from telomerecat import Csv2Length
 from telomerecat.core import TelomerecatInterface
-from telomerecat.readmodel import TelomereReadModel
+from telomerecat import readmodel
 
 ######################################################################
 ##
@@ -526,7 +526,8 @@ class ReadStatsFactory(object):
 
     def get_read_counts(self,path,sample_stats):
         read_stats = self.__path_to_read_array__(sample_stats["read_stats_path"])
-        TelomereReadModel(read_stats, sample_stats).run()
+        read_model = readmodel.run_model_par(sample_stats, read_stats)
+        pdb.set_trace()
         #self.__delete_analysis_paths__(read_stats_path)
         
         return read_counts
