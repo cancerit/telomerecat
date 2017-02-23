@@ -191,7 +191,7 @@ class Solution(object):
 
                 for exisiting_value in relevant_param:
                     new_values.append(np.random.normal(exisiting_value,
-                                                       exisiting_value*.5))
+                                                       exisiting_value))
 
                 relevant_dist.modify(modify_param, 
                                      new_values)
