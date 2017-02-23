@@ -331,7 +331,9 @@ class TelomereReadModel(object):
                 converged = True
 
             if iteration % 10 == 0:
-                print no_change, best_solution.score
+                print "its:%d chg:%d scr:%d" % (iteration, 
+                                                no_change, 
+                                                best_solution.score)
 
             iteration += 1
 
@@ -349,14 +351,14 @@ def model_process(job, sample_stats, observed_dist):
     best_solution = model_estimator.run()
     return best_solution
 
-def run_model_par(sample_stats, read_stats, N=20):
+def run_model_par(sample_stats, read_stats, n_procs, N=20):
 
     primary_read_model = TelomereReadModel(sample_stats, 
                                            read_stats=read_stats)
     observed_dist = primary_read_model.observed_dist
 
     freeze_support()
-    p = Pool(4)
+    p = Pool(n_procs)
     
     model_partial = partial(model_process, 
                             sample_stats=sample_stats, 

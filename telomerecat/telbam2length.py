@@ -526,7 +526,7 @@ class ReadStatsFactory(object):
 
     def get_read_counts(self,path,sample_stats):
         read_stats = self.__path_to_read_array__(sample_stats["read_stats_path"])
-        read_model = readmodel.run_model_par(sample_stats, read_stats)
+        read_model = readmodel.run_model_par(sample_stats, read_stats, self._total_procs)
         pdb.set_trace()
         #self.__delete_analysis_paths__(read_stats_path)
         
