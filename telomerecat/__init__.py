@@ -11,5 +11,6 @@ import bam2length
 import telbam2length
 import csv2length
 import error_estimator
+import readmodel
 
 from _version import __version__

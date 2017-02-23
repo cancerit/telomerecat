@@ -17,6 +17,7 @@ from pprint import pprint
 
 from telomerecat import Csv2Length
 from telomerecat.core import TelomerecatInterface
+from telomerecat.readmodel import TelomereReadModel
 
 ######################################################################
 ##
@@ -525,51 +526,10 @@ class ReadStatsFactory(object):
 
     def get_read_counts(self,path,sample_stats):
         read_stats = self.__path_to_read_array__(sample_stats["read_stats_path"])
-        self.__model_counts__(read_stats, sample_stats)
-
+        TelomereReadModel(read_stats, sample_stats).run()
         #self.__delete_analysis_paths__(read_stats_path)
         
         return read_counts
-
-    def __model_counts__(self, read_stats, sample_stats):
-
-        converged = False
-
-        total_reads = read_stats.shape[0]
-
-        observed_data = read_stats[:,0]
-        observed_dist = self.__dist_from_data__(observed_data, 
-                                                sample_stats["read_len"])
-
-        telo_N = observed_dist[:10].sum()
-        subtelo_N = observed_dist[10:30].sum()
-        nontelo_N = observed_dist[30:].sum()
-
-        telo_lambda = 2
-
-        subtelo_mu = 20
-        subtelo_sigma = 5
-
-        nontelo_mu = 60
-        nontelo_sigma = 5
-
-        while not converged:
-            telo_reads = np.random.exponential(telo_lambda,size=telo_N)
-            subtelo_reads = np.random.normal(subtelo_mu,subtelo_sigma,subtelo_N)
-            nontelo_reads = np.random.normal(nontelo_mu,nontelo_sigma,nontelo_N)
-
-            sim_data = np.concatenate((telo_reads, 
-                                       subtelo_reads, 
-                                       nontelo_reads))
-
-            sim_dist = self.__dist_from_data__(sim_data, 
-                                               sample_stats["read_len"])
-            pdb.set_trace()
-
-    def __dist_from_data__(self, data, read_len):
-        dist = np.histogram(data,bins = int(data.max()) )[0]
-        dist_buffer = [0] * int(read_len - len(dist))
-        return np.concatenate((dist, dist_buffer))
 
     def __delete_analysis_paths__(self, read_stat_paths):
         for analysis, path in read_stat_paths.items():
