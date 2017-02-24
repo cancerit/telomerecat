@@ -528,9 +528,11 @@ class ReadStatsFactory(object):
         read_stats = self.__path_to_read_array__(
             sample_stats["read_stats_path"])
 
-        read_model = readmodel.run_model_par(sample_stats,
-                                             read_stats,
-                                             self._total_procs)
+        # read_model = readmodel.TelomereReadModel(sample_stats,
+        #                                         read_stats=read_stats).run()
+        read_model = readmodel.get_read_model(sample_stats,
+                                              read_stats,
+                                              self._total_procs)
 
         model_output = self.dist_matrix(read_model, 100)
 

@@ -9,8 +9,13 @@ from abc import ABCMeta, abstractmethod
 class Distribution(object):
     __metaclass__ = ABCMeta
 
-    def __init__(self, params):
-        self.params = params
+    def __init__(self, params, observed_dist, lo, hi):
+        if params is None:
+            self.params = {}
+            self.params["count"] = observed_dist[lo:hi].sum()
+            self.bootstrap(observed_dist, lo, hi)
+        else:
+            self.params = params
 
     def __check_params__(self):
         for i in xrange(len(self.params["shape"])):
@@ -21,54 +26,46 @@ class Distribution(object):
         new_params = {"count": self.params["count"],
                       "shape": list(self.params["shape"])}
 
-        return type(self)(new_params)
+        return type(self)(params=new_params)
 
     def modify(self, param, value):
         self.params[param] = value
         self.__check_params__()
 
-    def filter_simulated_data(self, data, lo_limit, hi_limit):
-        return data
-        # filtered_data = []
-
-        # for d in data:
-        #     if d < lo_limit:
-        #         filtered_data.append(lo_limit)
-        #     elif d > hi_limit:
-        #         filtered_data.append(hi_limit)
-        #     else:
-        #         filtered_data.append(d)
-
-        # return np.array(filtered_data)
+    def dist_to_dat(self, dist, offset=0):
+        dat = []
+        for i, x in enumerate(dist):
+            dat.extend([i + offset, ] * x)
+        return np.array(dat)
 
     @abstractmethod
     def simulate(self):
         pass
 
     @abstractmethod
-    def bootstrap(self):
+    def bootstrap(self, observed_dist, lo, hi):
         pass
 
 
 class Exponential(Distribution):
 
-    def __init__(self,params):
-        super(Exponential, self).__init__(params)
+    def __init__(self, params=None, observed_dist=None, lo=None, hi=None):
+        super(Exponential, self).__init__(params, observed_dist, lo, hi)
 
-    def simulate(self, lo_limit = 0, hi_limit = 100):
+    def simulate(self, lo_limit=0, hi_limit=100):
         data = np.random.exponential(self.params["shape"][0],
                                      self.params["count"])
-        return self.filter_simulated_data(data, lo_limit, hi_limit)
+        return data
 
-    def bootstrap(self):
+    def bootstrap(self, observed_dist, lo, hi):
         param1 = np.random.uniform(0, 5)
         self.params["shape"] = [param1]
 
 
 class Beta(Distribution):
 
-    def __init__(self, params):
-        super(Beta, self).__init__(params)
+    def __init__(self, params=None, observed_dist=None, lo=None, hi=None):
+        super(Beta, self).__init__(params, observed_dist, lo, hi)
 
     def simulate(self, lo_limit=0, hi_limit=100):
         data = np.random.beta(self.params["shape"][0],
@@ -76,48 +73,58 @@ class Beta(Distribution):
                               self.params["count"])
         data = data * self.params["shape"][2]
 
-        return self.filter_simulated_data(data, lo_limit, hi_limit)
+        return data
 
-    def bootstrap(self):
-        param1 = np.random.uniform(0, 8)
-        param2 = np.random.uniform(0, 8)
-        param3 = np.random.uniform(0, 100)
-        self.params["shape"] = [param1, param2, param3]
+    def bootstrap(self, observed_dist, lo, hi):
+        self.params["shape"] = self.get_start_params(observed_dist, lo, hi)
+
+    def get_start_params(self, observed_dist, lo, hi):
+        def equation(x_bar, v_bar):
+            return ((x_bar * (1 - x_bar)) / v_bar) - 1
+
+        dat = self.dist_to_dat(observed_dist[lo:hi], offset=lo)
+        max_obs = dat.max()
+        dat = dat / (max_obs + .001)
+
+        dat_mean = dat.mean()
+        dat_var = dat.var()
+
+        alpha = dat_mean * equation(dat_mean, dat_var)
+        beta = (1 - dat_mean) * equation(dat_mean, dat_var)
+
+        return [alpha, beta, max_obs]
 
 
 class Uniform(Distribution):
 
-    def __init__(self, params):
-        super(Uniform, self).__init__(params)
+    def __init__(self, params=None, observed_dist=None, lo=None, hi=None):
+        super(Uniform, self).__init__(params, observed_dist, lo, hi)
 
     def simulate(self, lo_limit=0, hi_limit=100):
         data = np.random.uniform(self.params["shape"][0],
                                  self.params["shape"][1],
                                  self.params["count"])
-        return self.filter_simulated_data(data, lo_limit, hi_limit) 
+        return data
 
-    def bootstrap(self):
-        param1 = np.random.uniform(0,99)
-        param2 = np.random.uniform(param1,100)
-        self.params["shape"] = [param1, param2]
+    def bootstrap(self, observed_dist, lo, hi):
+        self.params["shape"] = [lo, hi]
 
 
 class Normal(Distribution):
 
-    def __init__(self, params):
-        super(Normal, self).__init__(params)
+    def __init__(self, params=None, observed_dist=None, lo=None, hi=None):
+        super(Normal, self).__init__(params, observed_dist, lo, hi)
 
     def simulate(self, lo_limit=0, hi_limit=100):
         data = np.random.normal(self.params["shape"][0],
                                 self.params["shape"][1],
                                 self.params["count"])
 
-        return self.filter_simulated_data(data, lo_limit, hi_limit)
+        return data
 
-    def bootstrap(self):
-        param1 = np.random.uniform(0, 100)
-        param2 = np.random.uniform(1, 10)
-        self.params["shape"] = [param1, param2]
+    def bootstrap(self, observed_dist, lo, hi):
+        dat = self.dist_to_dat(observed_dist[lo:hi], offset=lo)
+        self.params["shape"] = [dat.mean(), dat.std()]
 
 
 class Solution(object):
@@ -136,21 +143,20 @@ class Solution(object):
 
         read_len = len(observed_dist)
         ten_percent = int(read_len * .1)
-        twenty_five_percent = int(read_len * .25)
+        twenty_percent = int(read_len * .2)
         fifty_percent = int(read_len * .5)
 
-        telo_params = {"count": observed_dist[:twenty_five_percent].sum(),
-                       "shape": [0.9, 1.1, 50]}
-        self.distributions["atelo"] = Beta(telo_params)
+        self.distributions["atelo"] = Beta(observed_dist=observed_dist,
+                                           lo=0,
+                                           hi=twenty_percent)
 
-        subtelo_count = observed_dist[twenty_five_percent:fifty_percent].sum()
-        subtelo_params = {"count": subtelo_count,
-                          "shape": [ten_percent, fifty_percent]}
-        self.distributions["subtelo"] = Uniform(subtelo_params)
+        self.distributions["subtelo"] = Uniform(observed_dist=observed_dist,
+                                                lo=twenty_percent,
+                                                hi=fifty_percent)
 
-        nontelo_params = {"count": observed_dist[fifty_percent:].sum(),
-                          "shape": [fifty_percent, ten_percent]}
-        self.distributions["nontelo"] = Normal(nontelo_params)
+        self.distributions["nontelo"] = Normal(observed_dist=observed_dist,
+                                               lo=fifty_percent,
+                                               hi=fifty_percent + ten_percent)
 
     def copy(self):
 
@@ -161,50 +167,56 @@ class Solution(object):
 
         return Solution(self.read_len, new_dists)
 
+    def new_count_params(self, modify_dist):
+        modify_param = "count"
+
+        relevant_dist = self.distributions[modify_dist]
+        relevant_param = relevant_dist.params[modify_param]
+
+        dist_change = 0
+        for dist_name, cur_dist in self.distributions.items():
+            if dist_name != modify_dist:
+                cur_count = cur_dist.params[modify_param]
+
+                max_change = cur_count * .2
+                change = int(np.random.uniform(0, max_change))
+                if cur_count - change <= 0:
+                    change = 0
+
+                dist_change += change
+
+                cur_dist.modify("count", cur_count - change)
+
+        relevant_dist.modify("count", relevant_param + dist_change)
+
+    def new_shape_params(self, modify_dist):
+        modify_param = "shape"
+
+        relevant_dist = self.distributions[modify_dist]
+        relevant_param = relevant_dist.params[modify_param]
+
+        exisiting_value = relevant_param
+        new_values = []
+
+        for exisiting_value in relevant_param:
+            new_values.append(np.random.normal(exisiting_value,
+                                               exisiting_value))
+        relevant_dist.modify(modify_param,
+                             new_values)
+
     def get_new_solutions(self, new_count, modify_dist, modify_param):
 
         new_solutions = []
 
         for _ in xrange(new_count):
             new_solution = self.copy()
-
-            relevant_dist = new_solution.distributions[modify_dist]
-            relevant_param = relevant_dist.params[modify_param]
-
             if modify_param == "count":
-                dist_change = 0
-
-                for dist_name, cur_dist in new_solution.distributions.items():
-                    if dist_name != modify_dist:
-                        cur_count = cur_dist.params["count"]
-
-                        max_change = cur_count * .2
-                        change = int(np.random.uniform(0, max_change))
-                        if cur_count - change <= 0:
-                            change = 0
-
-                        dist_change += change
-
-                        cur_dist.modify("count", cur_count - change)
-
-                relevant_dist.modify("count", relevant_param + dist_change)
-
-                new_solutions.append(new_solution)
-
+                new_solution.new_count_params(modify_dist)
             elif modify_param == "shape":
-                exisiting_value = relevant_param
-                new_values = []
+                new_solution.new_shape_params(modify_dist)
+            new_solutions.append(new_solution)
 
-                for exisiting_value in relevant_param:
-                    new_values.append(np.random.normal(exisiting_value,
-                                                       exisiting_value))
-
-                relevant_dist.modify(modify_param,
-                                     new_values)
-
-                new_solutions.append(new_solution)
-
-        return new_solution
+        return new_solutions
 
     def set_score(self, new_score):
         self.score = new_score
@@ -229,15 +241,34 @@ class Solution(object):
         dist_buffer = [0] * int(self.read_len - len(dist))
         return np.concatenate((dist, dist_buffer))
 
-    def as_r(self, best_solution, read_len):
-        dist = self.get_dist(read_len)
+    def model_to_r(self):
+        dist = self.get_dist()
+        self.print_r(dist)
+
+    def print_r(self, dist):
         print "sim=c(" + ",".join(["%d" % (d,) for d in dist]) + ")"
 
+    def print_params(self):
+        def dist_to_string(dist):
+            shape_string = ",".join(["%.3f" % (s,)
+                                     for s in dist.params["shape"]])
+            return "%s|%d" % (shape_string, dist.params["count"])
+
+        dist_string = ""
+        for dist_name, dist in self.distributions.items():
+            dist_string += "%s: (%s) " % (dist_name[:2], dist_to_string(dist))
+
+        print "%d:: %s" % (self.score, dist_string)
 
 class TelomereReadModel(object):
 
-    def __init__(self, sample_stats, observed_dist=None, read_stats=None):
+    def __init__(self, sample_stats,
+                       observed_dist=None,
+                       read_stats=None,
+                       job_id=0):
+
         self.sample_stats = sample_stats
+        self.job_id = job_id
 
         if observed_dist is not None:
             self.observed_dist = observed_dist
@@ -274,19 +305,6 @@ class TelomereReadModel(object):
         # score = dif.sum() * change.sum()
         return int(dif.sum())
 
-    def __print_best_solution__(self, best_solution):
-
-        def dist_to_string(dist):
-            shape_string = ",".join(["%.3f" % (s,) \
-                                     for s in dist.params["shape"]])
-            return "%s|%d" % (shape_string, dist.params["count"])
-
-        dist_string = ""
-        for dist_name, dist in best_solution.distributions.items():
-            dist_string += "%s: (%s) " % (dist_name[:2], dist_to_string(dist)) 
-
-        print "%d:: %s" % (best_solution.score, dist_string)
-
     def get_permutations(self, param_count, dist_count):
         perms = np.array(np.meshgrid(range(param_count), range(dist_count))).T
         perms = perms.reshape(-1, 2).tolist()
@@ -304,7 +322,7 @@ class TelomereReadModel(object):
         param_count = len(parameters)
         dist_count = len(distributions)
 
-        permutations = self.get_permutations(param_count, 
+        permutations = self.get_permutations(param_count,
                                              dist_count)
 
         no_change = 0
@@ -313,23 +331,21 @@ class TelomereReadModel(object):
 
         while not converged:
 
-            param_type, dist_type = permutations[iteration % \
-                                                 len(permutations) ]
+            param_type, dist_type = permutations[iteration % len(permutations)]
 
             modify_dist = distributions[dist_type]
             modify_param = parameters[param_type]
 
-            new_solutions = best_solution.get_new_solutions(50, 
-                                                            modify_dist, 
+            new_solutions = best_solution.get_new_solutions(10,
+                                                            modify_dist,
                                                             modify_param)
 
             self.__score_solutions__(new_solutions)
 
             prev_best_solution = best_solution
-            best_solution = self.__get_best_solution__(best_solution, 
-                                                       new_solutions) 
-            #self.__print_best_solution__(best_solution)
-
+            best_solution = self.__get_best_solution__(best_solution,
+                                                       new_solutions)
+            
             if best_solution.score == prev_best_solution.score:
                 no_change += 1
             else:
@@ -339,9 +355,11 @@ class TelomereReadModel(object):
                 converged = True
 
             if iteration % 10 == 0:
-                print "its:%d chg:%d scr:%d" % (iteration, 
-                                                no_change, 
-                                                best_solution.score)
+                best_solution.print_params()
+                print "%d:: its:%d chg:%d scr:%d" % (self.job_id,
+                                                     iteration,
+                                                     no_change,
+                                                     best_solution.score)
 
             iteration += 1
 
@@ -352,14 +370,17 @@ def get_best_solution(results):
     results.sort(key=lambda s: s.score)
     return results[0]
 
+
 def model_process(job, sample_stats, observed_dist):
     np.random.seed()
     model_estimator = TelomereReadModel(sample_stats,
-                                        observed_dist=observed_dist)
+                                        observed_dist=observed_dist,
+                                        job_id=job)
     best_solution = model_estimator.run()
     return best_solution
 
-def run_model_par(sample_stats, read_stats, n_procs, N=20):
+
+def get_read_model(sample_stats, read_stats, n_procs, N=25):
 
     primary_read_model = TelomereReadModel(sample_stats,
                                            read_stats=read_stats)
@@ -368,17 +389,15 @@ def run_model_par(sample_stats, read_stats, n_procs, N=20):
     freeze_support()
     p = Pool(n_procs)
 
-    model_partial = partial(model_process, 
-                            sample_stats=sample_stats, 
+    model_partial = partial(model_process,
+                            sample_stats=sample_stats,
                             observed_dist=observed_dist)
-    results = p.map(model_partial, xrange(N))
+    results = p.map(model_partial, range(N))
     p.close()
 
     best_solution = get_best_solution(results)
 
     return best_solution
-
-
 
 
 
