@@ -511,8 +511,8 @@ class ReadStatsFactory(object):
 
     def __init__(self,temp_dir,
                       total_procs=4,
-                      task_size = 5000,
-                      trim_reads = 0,
+                      task_size=5000,
+                      trim_reads=0,
                       allow=0,
                       debug_print=False):
 
@@ -524,24 +524,39 @@ class ReadStatsFactory(object):
         self._trim = trim_reads
         self._allow = allow
 
-    def get_read_counts(self,path,sample_stats):
-        read_stats = self.__path_to_read_array__(sample_stats["read_stats_path"])
-        read_model = readmodel.run_model_par(sample_stats, read_stats, self._total_procs)
+    def get_read_counts(self, path, sample_stats):
+        read_stats = self.__path_to_read_array__(
+            sample_stats["read_stats_path"])
+
+        read_model = readmodel.run_model_par(sample_stats,
+                                             read_stats,
+                                             self._total_procs)
+
+        model_output = self.dist_matrix(read_model, 100)
+
         pdb.set_trace()
-        #self.__delete_analysis_paths__(read_stats_path)
-        
+        # self.__delete_analysis_paths__(read_stats_path)
         return read_counts
+
+    def dist_matrix(self, read_model, count):
+
+        results = []
+        for _ in xrange(count):
+            results.append(read_model.get_dist(exclude_dists=["subtelo",
+                                                              "nontelo"]))
+
+        return np.array(results).reshape(count, -1)
 
     def __delete_analysis_paths__(self, read_stat_paths):
         for analysis, path in read_stat_paths.items():
             os.remove(path)
 
-    def __path_to_read_array__(self,read_stats_path):
-        return pd.read_csv(read_stats_path,header=None).values
+    def __path_to_read_array__(self, read_stats_path):
+        return pd.read_csv(read_stats_path, header=None).values
 
     def read_array_to_counts(self, read_array, error_profile, sample_variance):
-        complete_reads,boundary_reads = \
-                        self.__get_complete_status__(read_array,error_profile)
+        complete_reads, boundary_reads = \
+            self.__get_complete_status__(read_array,error_profile)
 
 
 
@@ -718,7 +733,6 @@ class Telbam2Length(TelomerecatInterface):
                                 total_procs,
                                 trim,
                                 allow):
-
 
         read_stats_factory = ReadStatsFactory(temp_dir=self.temp_dir,
                                               total_procs=total_procs,

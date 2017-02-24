@@ -10,6 +10,7 @@ from collections import Counter
 import numpy as np
 
 class ReadRecord(object):
+
     def __init__(self, read_id, base_id, base):
         self.read_id = read_id
         self.base_id = base_id
