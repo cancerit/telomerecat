@@ -363,8 +363,10 @@ class TelomereReadModel(object):
 
             iteration += 1
 
-        print "FINISHED:", best_solution.score
+        print "JOB %d FINISHED. SCORE: %d" % (self.job_id,
+                                              best_solution.score,)
         return best_solution
+
 
 def get_best_solution(results):
     results.sort(key=lambda s: s.score)

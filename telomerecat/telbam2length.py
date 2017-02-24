@@ -450,6 +450,17 @@ class SampleStatsFinder(object):
                                             #trim_reads=self._trim)
 
 
+        def telomere_heuristic(telo_read):
+            prev = None
+            distances = []
+            for i in telo_read.mima_loci:
+                if prev is not None:
+                    distances.append(i - prev)
+                prev = i
+            if len(distances) == 0:
+                distances.append(100)
+            return np.mean(distances)
+
         def prepare_stats(telo_read, read):
             qual_bytes = [ord(q) for q in telo_read.qual]
 
@@ -462,7 +473,8 @@ class SampleStatsFinder(object):
                      min(qual_bytes),
                      max(qual_bytes),
                      len(telo_read.seq),
-                     len(read.seq))
+                     len(read.seq),
+                     telomere_heuristic(telo_read))
 
             return stats
 
@@ -470,6 +482,13 @@ class SampleStatsFinder(object):
             telo_reads = \
                 [telo_read_factory.get_telo_read(read) for read in reads]
 
+            print_check = [t.n_loci == 10 for t in telo_reads]
+            if any(print_check):
+                for t in telo_reads:
+                    telo_read_factory.mima_logic.print_mima(t.seq,
+                                                            t.qual,
+                                                            t.pattern)
+                print "--"
             read_1_stats = prepare_stats(telo_reads[0],reads[0])
             read_2_stats = prepare_stats(telo_reads[1],reads[1])
 
@@ -491,7 +510,7 @@ class SampleStatsFinder(object):
             stats = {"read_stats":get_read_entries(reads)}
             return stats
 
-        structures = {"read_stats":{"data":np.zeros((2,20)),
+        structures = {"read_stats":{"data":np.zeros((2,22)),
                                     "store_method":"vstack"}}
 
         stat_interface = parabam.Stat(temp_dir=self.temp_dir,
@@ -525,7 +544,7 @@ class ReadStatsFactory(object):
         self._allow = allow
 
     def get_read_counts(self, path, sample_stats):
-        read_stats = self.__path_to_read_array__(
+        read_stats = self.__path_to_read_stats__(
             sample_stats["read_stats_path"])
 
         # read_model = readmodel.TelomereReadModel(sample_stats,
@@ -534,18 +553,17 @@ class ReadStatsFactory(object):
                                               read_stats,
                                               self._total_procs)
 
-        model_output = self.dist_matrix(read_model, 100)
+        read_counts = self.read_stats_to_counts(read_stats, read_model)
 
         pdb.set_trace()
         # self.__delete_analysis_paths__(read_stats_path)
         return read_counts
 
-    def dist_matrix(self, read_model, count):
+    def dist_matrix(self, read_model, exclude_dists, count):
 
         results = []
         for _ in xrange(count):
-            results.append(read_model.get_dist(exclude_dists=["subtelo",
-                                                              "nontelo"]))
+            results.append(read_model.get_dist(exclude_dists=exclude_dists))
 
         return np.array(results).reshape(count, -1)
 
@@ -553,28 +571,21 @@ class ReadStatsFactory(object):
         for analysis, path in read_stat_paths.items():
             os.remove(path)
 
-    def __path_to_read_array__(self, read_stats_path):
+    def __path_to_read_stats__(self, read_stats_path):
         return pd.read_csv(read_stats_path, header=None).values
 
-    def read_array_to_counts(self, read_array, error_profile, sample_variance):
+    def read_stats_to_counts(self, read_stats, read_model):
+
         complete_reads, boundary_reads = \
-            self.__get_complete_status__(read_array,error_profile)
-
-
-
-        counts = Counter(read_array[:,0])
-        count_arr = [str(counts[x]) for x in np.arange(0,150,1.0)]
-        print "c("+",".join(count_arr)+")"
-
-        pdb.set_trace()
+            self.__get_complete_status__(read_stats, read_model)
 
         f2_count,f4_count = self.__get_boundary_counts__(boundary_reads)
         f1_count = self.__get_f1_count__(complete_reads)
 
-        return_dat = { "F2":int(f2_count),
-                       "F1":int(f1_count),
-                       "F4":f4_count,
-                       "sample_variance":sample_variance}
+        return_dat = { "F2": int(f2_count),
+                       "F1": int(f1_count),
+                       "F4": f4_count,
+                       "sample_variance": 0}
 
         return return_dat
 
@@ -596,13 +607,16 @@ class ReadStatsFactory(object):
         total_reads = boundary_reads.shape[0]
         return f2_count,f4_count,total_reads
         
-    def __get_complete_status__(self,read_array,error_profile):
+    def __get_complete_status__(self,read_stats, read_model):
         boundary_indicies = []
         complete_indicies = []
 
-        for i in xrange(int(read_array.shape[0])):
-            read_info = map(int,read_array[i,[0,-2]])
-            pair_info = map(int,read_array[i,[2,-1]])
+        telo_est = self.dist_matrix(read_model, ["subtelo", "nontelo"], 100)
+        subtelo_est = self.dist_matrix(read_model, ["atelo", "nontelo"], 100)
+
+        for i in xrange(int(read_stats.shape[0])):
+            read_info = map(int,read_stats[i,[0,-2]])
+            pair_info = map(int,read_stats[i,[2,-1]])
 
             read = error_profile[read_info[0],read_info[1]] 
             pair = error_profile[pair_info[0],pair_info[1]]
@@ -612,8 +626,8 @@ class ReadStatsFactory(object):
             elif (not read) and pair:
                 boundary_indicies.append(i)
 
-        return read_array[complete_indicies,:],\
-                read_array[boundary_indicies,:]
+        return read_stats[complete_indicies,:],\
+                read_stats[boundary_indicies,:]
 
 class Telbam2Length(TelomerecatInterface):
 
@@ -637,19 +651,19 @@ class Telbam2Length(TelomerecatInterface):
                                         cmd_run=cmd_run)
 
     def run_cmd(self):
-        self.run(input_paths = self.cmd_args.input,
-                 trim = self.cmd_args.trim,
-                 allow = self.cmd_args.allow,
-                 inserts_path = self.cmd_args.insert,
-                 correct_f2a = not self.cmd_args.disable_correction,
-                 output_path = self.cmd_args.output)
+        self.run(input_paths=self.cmd_args.input,
+                 trim=self.cmd_args.trim,
+                 allow=self.cmd_args.allow,
+                 inserts_path=self.cmd_args.insert,
+                 correct_f2a=not self.cmd_args.disable_correction,
+                 output_path=self.cmd_args.output)
 
-    def run(self,input_paths,
-                 trim = 0,
-                 allow = 0,
-                 output_path = None,
-                 correct_f2a = True,
-                 inserts_path = None):
+    def run(self, input_paths,
+                  trim=0,
+                  allow=0,
+                  output_path=None,
+                  correct_f2a=True,
+                  inserts_path=None):
         
         """The main function for invoking the part of the 
            program which creates a telbam from a bam
@@ -675,10 +689,10 @@ class Telbam2Length(TelomerecatInterface):
         self.__output__(" Collecting meta-data for all samples | %s\n" \
                             % (self.__get_date_time__(),),1)
 
-        sample_stats_finder = SampleStatsFinder(self.temp_dir, 
-                                        self.total_procs,
-                                        self.task_size,
-                                        trim)
+        sample_stats_finder = SampleStatsFinder(self.temp_dir,
+                                                self.total_procs,
+                                                self.task_size,
+                                                trim)
 
         for sample_path,sample_name, in izip(input_paths,names):
             sample_intro = "\t- %s | %s\n" % (sample_name, 
