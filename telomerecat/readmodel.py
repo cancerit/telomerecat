@@ -1,3 +1,4 @@
+import time
 import pdb
 import numpy as np
 from  multiprocessing import Pool,freeze_support
@@ -329,6 +330,8 @@ class TelomereReadModel(object):
         iteration = 0
         converged = False
 
+        start = time.time()
+
         while not converged:
 
             param_type, dist_type = permutations[iteration % len(permutations)]
@@ -354,17 +357,20 @@ class TelomereReadModel(object):
             if no_change == 100:
                 converged = True
 
-            if iteration % 10 == 0:
-                best_solution.print_params()
-                print "%d:: its:%d chg:%d scr:%d" % (self.job_id,
-                                                     iteration,
-                                                     no_change,
-                                                     best_solution.score)
+            # if iteration % 10 == 0:
+            #     best_solution.print_params()
+            #     print "%d:: its:%d chg:%d scr:%d" % (self.job_id,
+            #                                          iteration,
+            #                                          no_change,
+            #                                          best_solution.score)
 
             iteration += 1
 
-        print "JOB %d FINISHED. SCORE: %d" % (self.job_id,
-                                              best_solution.score,)
+        print "JOB %d:: SCORE: %d TIME:%d" % \
+                  (self.job_id,
+                   best_solution.score,
+                   time.time() - start,)
+
         return best_solution
 
 
@@ -382,7 +388,7 @@ def model_process(job, sample_stats, observed_dist):
     return best_solution
 
 
-def get_read_model(sample_stats, read_stats, n_procs, N=25):
+def get_read_model(sample_stats, read_stats, n_procs, N=20):
 
     primary_read_model = TelomereReadModel(sample_stats,
                                            read_stats=read_stats)
