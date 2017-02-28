@@ -484,10 +484,13 @@ class SampleStatsFinder(object):
 
             # print_check = [t.n_loci == 10 for t in telo_reads]
             # if any(print_check):
+            #     print "-----"
+            #     print ""
             #     for t in telo_reads:
             #         telo_read_factory.mima_logic.print_mima(t.seq,
             #                                                 t.qual,
             #                                                 t.pattern)
+            #         print telomere_heuristic(t)
             #     print "--"
             read_1_stats = prepare_stats(telo_reads[0], reads[0])
             read_2_stats = prepare_stats(telo_reads[1], reads[1])
@@ -555,7 +558,7 @@ class ReadStatsFactory(object):
                                               self._total_procs)
 
         read_counts = self.read_stats_to_counts(read_stats, read_model)
-        read_counts["sample_variance"] = 0
+        read_counts["sample_variance"] = 3
         # self.__delete_analysis_paths__(read_stats_path)
         return read_counts
 
@@ -648,7 +651,8 @@ class ReadStatsFactory(object):
 
             if mima == 0 or mima == 1:
                 complete_ends.extend(relevant_reads[:, -1])
-            elif round(complete_percentage[mima], 3) > 0:
+            elif mima < len(complete_percentage) and \
+                     round(complete_percentage[mima], 3) > 0:
                 complete_count = \
                     relevant_reads.shape[0] * complete_percentage[mima]
                 complete_count = int(complete_count)
