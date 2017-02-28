@@ -391,96 +391,65 @@ class VitalStatsFinder(object):
         self._task_size = task_size
         self._trim_length = trim_length
 
-    def __csv_to_dict__(self,stats_path):
-        insert_dat = np.genfromtxt(stats_path,delimiter=",",
-                                names=True,dtype=("S256",float,float,
-                                                         float,float,
-                                                         float,float,
-                                                         float,float,
-                                                         float))
-
-        ins_N = int(insert_dat['N'])
-        if ins_N == 0:
-            insert_mean = -1
-            insert_sd = -1
-        else:
-            ins_sum = int(insert_dat['sum'])
-            ins_power_2 = int(insert_dat['power_2'])
-
-            insert_mean,insert_sd = \
-                        self.__get_mean_and_sd__(ins_sum, ins_power_2, ins_N)
-    
-        min_qual = int(insert_dat['min_qual'])
-        qual_mean,qual_sd = self.__get_mean_and_sd__(insert_dat["qual_sum"],
-                                                    insert_dat["qual_power_2"],
-                                                    insert_dat["qual_N"])
-
-        return {"insert_mean":insert_mean, 
-                "insert_sd": insert_sd,
-                "min_qual":min_qual,
-                "max_qual":int(insert_dat['max_qual']),
-                "read_len":int(insert_dat['read_len']),
-                "qual_mean":qual_mean,
-                "qual_sd":qual_sd}
-
-    def __get_mean_and_sd__(self,x_sum,x_power_2,x_N):
-        x_mean = x_sum / x_N
-        x_sd = np.sqrt( (x_N * x_power_2) - x_sum**2) / x_N
-
-        return x_mean,x_sd
-
     def get_vital_stats(self,sample_path):
 
-        vital_stats_csv = self.__run_vital_rule__(sample_path)
-        vital_stats = self.__csv_to_dict__(vital_stats_csv)
+        csv_path = self.__run_vital_rule__(sample_path)
+        vital_stats = self.csv_to_vital_stats(csv_path)
+        os.remove(csv_path)        
+        return vital_stats
+
+    def csv_to_vital_stats(self, csv_path):
+
+        read_stats = pd.read_csv(csv_path).values
+
+        vital_stats = {}
+        self.__load_insert_dat__(vital_stats, read_stats)
+
+        vital_stats["read_len"] = int(read_stats[:,2].mean())
+        vital_stats["min_qual"] = int(read_stats[:,3].min())
+        vital_stats["max_qual"] = int(read_stats[:,4].max())
+
         vital_stats["phred_offset"] = vital_stats["min_qual"]
         vital_stats["initial_read_len"] = vital_stats["read_len"]
 
         if self._trim_length > 0:
             vital_stats["read_len"] = self._trim_length 
- 
+
         return vital_stats
 
+    def __load_insert_dat__(self, sample_stats, read_stats):
+        
+        well_map_thresh = np.percentile(read_stats[:,1],66)
+        well_map_mask = read_stats[:,1] >= well_map_thresh
+        well_mapped_reads = read_stats[well_map_mask,:]
+
+        sample_stats["insert_mean"] = round(well_mapped_reads[:,0].mean(),3)
+        sample_stats["insert_sd"] = round(well_mapped_reads[:,0].std(),3)
+
     def __run_vital_rule__(self,sample_path,keep_in_temp=True):
-        def rule(read,constants,master):
-            stats = {}
-
-            hash_count = read.qual.count("#")
-            if read.is_read1 and read.is_proper_pair and read.mapq > 38:
-                insert_size = abs(read.template_length)
-                stats["sum"] = insert_size
-                stats["power_2"] = insert_size**2
-                stats["N"] = 1
+        def rule(read, constants, master):
             
-            stats["read_len"] =  len(read.seq)
-            byte_vals = map(ord,read.qual)
-            min_qual = min(byte_vals)
-            max_qual = max(byte_vals)
+            if read.is_read1 and read.is_proper_pair:
+                read_dat = np.zeros((1,6))
+                byte_vals = [ord(b) for b in read.qual]
+                min_qual = min(byte_vals)
+                max_qual = max(byte_vals)
 
-            qual_mean = np.mean(byte_vals)
-            stats["qual_sum"] = qual_mean
-            stats["qual_power_2"] = qual_mean**2
-            stats["qual_N"] = 1
+                read_dat[:] = [abs(read.template_length),
+                                read.mapq,
+                                len(read.seq),
+                                min_qual,
+                                max_qual,
+                                np.mean(byte_vals)]
 
-            stats["min_qual"] = min_qual
-            stats["max_qual"] = max_qual
+                dat = {"read_stats":read_dat}
+            else:
+                dat = {}
+            
+            return dat
 
-            return stats
-
-        structures = {}
-
-        structures["sum"] = {"data":0,"store_method":"cumu"}
-        structures["power_2"] = {"data":0,"store_method":"cumu"}
-        structures["N"] = {"data":0,"store_method":"cumu"}
-        structures["read_len"] = {"data":0,"store_method":"max"}
-
-        structures["min_qual"] = {"data":999,"store_method":"min"}
-        structures["max_qual"] = {"data":0,"store_method":"max"}
-
-
-        structures["qual_sum"] = {"data":0,"store_method":"cumu"}
-        structures["qual_power_2"] = {"data":0,"store_method":"cumu"}    
-        structures["qual_N"] = {"data":0,"store_method":"cumu"}  
+        structures = {"read_stats": {"data": np.zeros((1, 6)),
+                                    "store_method": "vstack"}}
 
         stat_interface = parabam.Stat(temp_dir=self.temp_dir,
                                       total_procs = self._total_procs,
@@ -492,7 +461,7 @@ class VitalStatsFinder(object):
                                        rule = rule,
                                        struc_blueprint = structures)
 
-        return out_paths["global"]["stats"]
+        return out_paths[sample_path]["read_stats"]
 
 class ReadStatsFactory(object):
 
@@ -774,8 +743,8 @@ class ReadStatsFactory(object):
                                                 trim_reads=self._trim)
         phred_offset = vital_stats["phred_offset"]
 
-        maxtrix_max = (vital_stats["max_qual"] - phred_offset)+1
-        matrix_shape = (vital_stats["read_len"]+1,maxtrix_max)
+        matrix_max = (vital_stats["max_qual"] - phred_offset)+1
+        matrix_shape = (vital_stats["read_len"]+1, matrix_max)
 
         def get_return_stats(reads):
 
@@ -808,7 +777,7 @@ class ReadStatsFactory(object):
                     qual_bytes  = [ord(q) - phred_offset for q in rand_quals]
                     rand_avg = np.mean(qual_bytes)
 
-                    random_counts[int(sample_size),int(rand_avg)] += 1
+                    random_counts[int(sample_size), int(rand_avg)] += 1
 
             results = {"read_array":np.array(return_dat),
                       "random_counts":random_counts,
