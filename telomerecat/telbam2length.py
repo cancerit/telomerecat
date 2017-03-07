@@ -46,14 +46,14 @@ class SimpleReadFactory(object):
 
         self.mima_logic = MismatchingLociLogic()
 
-    def get_simple_read(self,read):
+    def get_simple_read(self,read, all_patterns):
         seq,qual = self.__flip_and_compliment__(read)
         if self._trim_reads > 0:
             seq,qual = (seq[:self._trim_reads],
                         qual[:self._trim_reads])
 
-        (mima_loci,frameshift_loci),pattern = \
-                self.mima_logic.get_telo_mismatch(seq)
+        pattern,mima_loci,frameshift_loci = \
+                self.mima_logic.get_telo_mismatch(seq,all_patterns)
 
         avg_qual,n_loci = self.__get_phred_score__(qual, 
                                                    mima_loci, 
@@ -121,7 +121,9 @@ class SimpleReadFactory(object):
         if pattern is None:
             return None
         else:
-            return pattern == "CCCTAA"
+            c_count = pattern.count("C")
+            g_count = pattern.count("G")
+            return c_count > g_count
 
     def __get_pattern__(self,seq):
         cta,tag = "CCCTAA","TTAGGG"
@@ -144,26 +146,48 @@ class SimpleReadFactory(object):
 
 class MismatchingLociLogic(object):
 
-    def get_telo_mismatch(self, seq):
+    def __init__(self):
+        self._template_patterns = ("CCCTAA","TTAGGG",)
+        self._all_patterns = self.get_all_patterns()
+        #self._all_patterns = ("CCCTAA","TTAGGG",)
 
-        c_rich_count = seq.count("CCCTAA")
-        g_rich_count = seq.count("TTAGGG")
+    def get_all_patterns(self):
+        all_patterns = [] #list(self._template_patterns)
+        for pattern in self._template_patterns:
+            for i in xrange(len(pattern)):
+                all_patterns.append(pattern[:i] + "." + pattern[i+1:])
+        return all_patterns
 
-        if c_rich_count > g_rich_count:
-            return self.get_mismatching_loci(seq, "CCCTAA"), "CCCTAA"
-        elif g_rich_count > c_rich_count:
-            return self.get_mismatching_loci(seq, "TTAGGG"), "TTAGGG"
+    def get_search_patterns(self, seq):
+        search_patterns = list(self._template_patterns)
+        for pattern in self._all_patterns:
+            if re.search(pattern, seq):
+                search_patterns.append(pattern)
+        return search_patterns
+
+    def get_telo_mismatch(self, seq, all_patterns):
+        pattern_scores = {}
+
+        if all_patterns:
+            search_patterns = self.get_search_patterns(seq)
         else:
-            c_mima, c_fuse = self.get_mismatching_loci(seq, "CCCTAA")
-            g_mima, g_fuse = self.get_mismatching_loci(seq, "TTAGGG")
+            search_patterns = ("TTAGGG", "CCCTAA",)
 
-            c_score = len(c_mima) + len(c_fuse)
-            g_score = len(g_mima) + len(g_fuse)
+        for pattern in search_patterns:
+            mima_loci, fuse_loci = self.get_mismatching_loci(seq, pattern)
+            score = len(mima_loci) + len(fuse_loci)
 
-            if c_score < g_score:
-                return (c_mima, c_fuse), "CCCTAA"
-            else:
-                return (g_mima, g_fuse), "TTAGGG"
+            pattern_scores[pattern] = {"score":score, 
+                                       "mima":mima_loci, 
+                                       "fuse":fuse_loci}
+            if score == 0:
+                break
+
+        pattern_list = pattern_scores.items()
+        pattern_list.sort(key = lambda x: x[1]["score"] )
+
+        best_pattern, pattern_dat = pattern_list[0]
+        return best_pattern, pattern_dat["mima"], pattern_dat["fuse"]
 
     def get_mismatching_loci(self, seq, pattern):
         segments = re.split("(%s)"%(pattern,), seq)
@@ -188,7 +212,7 @@ class MismatchingLociLogic(object):
             
             mima_loci.extend(np.array(segment_loci)+offset)
 
-            if pattern in neighbours[0] or pattern in seg:
+            if re.search(pattern,neighbours[0]) or re.search(pattern,seg):
                 if offset-1 not in mima_loci and \
                     offset+1 not in mima_loci and \
                      offset not in mima_loci:
@@ -218,7 +242,7 @@ class MismatchingLociLogic(object):
         best_score = float("Inf")
         best_mima = []
 
-        if pattern in seq and not override:
+        if re.match(pattern, seq) and not override:
             best_score, best_mima = 0,[]
         elif len(seq) == 1:
             best_score, best_mima =  1,[0]
@@ -247,7 +271,7 @@ class MismatchingLociLogic(object):
                 mima_loci = []
                 score = 0
                 for s, (l, c) in izip(seq, comparison_seq):
-                    if s != c:
+                    if s != c and c != ".":
                         mima_loci.append(l)
                         score += 1
                         if score > best_score:
@@ -274,7 +298,7 @@ class MismatchingLociLogic(object):
         merge_segments = list(segments)
 
         for i,seg in enumerate(segments):
-            if pattern not in seg:
+            if not re.search(pattern,seg):
                 top_trim = 0
                 bottom_trim = len(seg)
                 
@@ -310,7 +334,7 @@ class MismatchingLociLogic(object):
         generator = self.get_sequence_generator(seq, pattern, reverse)
 
         for c,s in generator:
-            if c == s:
+            if c == s or s == ".":
                 i += 1
             else:
                 break
@@ -344,7 +368,7 @@ class MismatchingLociLogic(object):
         collapsed_segments = []
         current_segment = ''
         for seg in segments:
-            if seg == pattern:
+            if re.match(pattern, seg):
                 current_segment += seg
             else:
                 if current_segment != '':
@@ -364,7 +388,7 @@ class MismatchingLociLogic(object):
 
         print "Mima:",mima_loci
         print "Fuse:",fuse_loci
-        print seq
+        print seq, pat
         print loci_status
         print qual
 
@@ -392,10 +416,10 @@ class VitalStatsFinder(object):
         self._trim_length = trim_length
 
     def get_vital_stats(self,sample_path):
-
         csv_path = self.__run_vital_rule__(sample_path)
         vital_stats = self.csv_to_vital_stats(csv_path)
-        os.remove(csv_path)        
+        os.remove(csv_path)
+        
         return vital_stats
 
     def csv_to_vital_stats(self, csv_path):
@@ -405,7 +429,7 @@ class VitalStatsFinder(object):
         vital_stats = {}
         self.__load_insert_dat__(vital_stats, read_stats)
 
-        vital_stats["read_len"] = int(read_stats[:,2].mean())
+        vital_stats["read_len"] = int(read_stats[:,2].max())
         vital_stats["min_qual"] = int(read_stats[:,3].min())
         vital_stats["max_qual"] = int(read_stats[:,4].max())
 
@@ -419,47 +443,47 @@ class VitalStatsFinder(object):
 
     def __load_insert_dat__(self, sample_stats, read_stats):
         
-        well_map_thresh = np.percentile(read_stats[:,1],66)
-        well_map_mask = read_stats[:,1] >= well_map_thresh
-        well_mapped_reads = read_stats[well_map_mask,:]
+        insert_mask = (read_stats[:, 7] + read_stats[:, 6]) == 2
+        insert_stats = read_stats[insert_mask, :]
 
-        sample_stats["insert_mean"] = round(well_mapped_reads[:,0].mean(),3)
-        sample_stats["insert_sd"] = round(well_mapped_reads[:,0].std(),3)
+        well_map_thresh = insert_stats[:, 1].max()
+        well_map_mask = insert_stats[:, 1] >= well_map_thresh
+        well_mapped_reads = insert_stats[well_map_mask, :]
 
-    def __run_vital_rule__(self,sample_path,keep_in_temp=True):
+        sample_stats["insert_mean"] = round(well_mapped_reads[:, 0].mean(), 3)
+        sample_stats["insert_sd"] = round(well_mapped_reads[:, 0].std(), 3)
+
+    def __run_vital_rule__(self, sample_path, keep_in_temp=True):
         def rule(read, constants, master):
             
-            if read.is_read1 and read.is_proper_pair:
-                read_dat = np.zeros((1,6))
-                byte_vals = [ord(b) for b in read.qual]
-                min_qual = min(byte_vals)
-                max_qual = max(byte_vals)
+            read_dat = np.zeros((1, 8))
+            byte_vals = [ord(b) for b in read.qual]
+            min_qual = min(byte_vals)
+            max_qual = max(byte_vals)
 
-                read_dat[:] = [abs(read.template_length),
-                                read.mapq,
-                                len(read.seq),
-                                min_qual,
-                                max_qual,
-                                np.mean(byte_vals)]
+            read_dat[:] = [abs(read.template_length),
+                           read.mapq,
+                           len(read.seq),
+                           min_qual,
+                           max_qual,
+                           np.mean(byte_vals),
+                           int(read.is_proper_pair),
+                           int(read.is_read1)]
 
-                dat = {"read_stats":read_dat}
-            else:
-                dat = {}
-            
-            return dat
+            return {"read_stats":read_dat}
 
-        structures = {"read_stats": {"data": np.zeros((1, 6)),
-                                    "store_method": "vstack"}}
+        structures = {"read_stats": {"data": np.zeros((1, 8)),
+                                     "store_method": "vstack"}}
 
         stat_interface = parabam.Stat(temp_dir=self.temp_dir,
-                                      total_procs = self._total_procs,
-                                      task_size = 10000,
+                                      total_procs=self._total_procs,
+                                      task_size=10000,
                                       keep_in_temp=keep_in_temp)
 
-        out_paths = stat_interface.run(input_paths= [sample_path],
-                                       constants = {},
-                                       rule = rule,
-                                       struc_blueprint = structures)
+        out_paths = stat_interface.run(input_paths=[sample_path],
+                                       constants={},
+                                       rule=rule,
+                                       struc_blueprint=structures)
 
         return out_paths[sample_path]["read_stats"]
 
@@ -467,9 +491,10 @@ class ReadStatsFactory(object):
 
     def __init__(self,temp_dir,
                       total_procs=4,
-                      task_size = 5000,
-                      trim_reads = 0,
-                      allow = 0,
+                      task_size=5000,
+                      trim_reads=0,
+                      allow=0,
+                      all_patterns=False,
                       debug_print=False):
 
         self.temp_dir = temp_dir
@@ -480,6 +505,9 @@ class ReadStatsFactory(object):
         self._trim = trim_reads
 
         self._allow_percent = allow
+
+        #self.all_patterns = all_patterns
+        self.all_patterns = True
 
     def get_read_counts(self,path,vital_stats):
         read_stat_paths = self.run_read_stat_rule(path, vital_stats)
@@ -567,7 +595,6 @@ class ReadStatsFactory(object):
         y_start = int(read_counts.shape[1] * .5)
         mask[x_start:,y_start:] = 1
         return mask
-
 
     def __prune_error_profile__(self, error_profile):
         
@@ -704,9 +731,6 @@ class ReadStatsFactory(object):
     def __get_boundary_counts__(self,boundary_reads):
         f2_count,f4_count,total_reads = \
                  self.__get_read_counts__(boundary_reads)
-
-        observed_f2a_ratio = (f2_count-f4_count) / float(total_reads)
-        observed_f2a_weight = f2_count
             
         return f2_count, f4_count
 
@@ -721,16 +745,19 @@ class ReadStatsFactory(object):
         complete_indicies = []
 
         for i in xrange(int(read_array.shape[0])):
-            read_info = map(int,read_array[i,[0,-2]])
-            pair_info = map(int,read_array[i,[2,-1]])
 
-            read = error_profile[read_info[0],read_info[1]] 
-            pair = error_profile[pair_info[0],pair_info[1]]
+            if read_array[i,4] + read_array[i,5] == 0:
 
-            if read and pair:
-                complete_indicies.append(i)
-            elif (not read) and pair:
-                boundary_indicies.append(i)
+                read_info = map(int,read_array[i,[0,-2]])
+                pair_info = map(int,read_array[i,[2,-1]])
+
+                read = error_profile[read_info[0],read_info[1]] 
+                pair = error_profile[pair_info[0],pair_info[1]]
+
+                if read and pair:
+                    complete_indicies.append(i)
+                elif (not read) and pair:
+                    boundary_indicies.append(i)
 
         return read_array[complete_indicies,:],\
                 read_array[boundary_indicies,:]
@@ -752,25 +779,30 @@ class ReadStatsFactory(object):
                             int(reads[0].five_prime),
                             len(reads[1].mima_loci),
                             int(reads[1].five_prime),
+                            reads[0].seq.count("N"),
+                            reads[1].seq.count("N"),
                             reads[0].avg_qual,
                             reads[1].avg_qual]
 
             return return_stats
 
         def rule(reads, constants, master):
-            simple_reads = [simple_read_factory.get_simple_read(read) \
+            simple_reads = [simple_read_factory.get_simple_read(read, 
+                                                        self.all_patterns) \
                                                          for read in reads]
-            return_dat = np.zeros((2,6))
+            return_dat = np.zeros((2,8))
             return_dat[0,:] = get_return_stats(simple_reads)
             return_dat[1,:] = get_return_stats(simple_reads[::-1])
 
             random_counts = np.zeros(matrix_shape)
             mima_counts = np.zeros(matrix_shape)
 
+            ml = simple_read_factory.mima_logic
+
             for read in simple_reads:
+
                 mima_counts[read.n_loci,int(read.avg_qual)] += 1
 
-                #sample_size = int(np.random.uniform(1,80))
                 sample_size = len(read.mima_loci)
                 if sample_size > 0:
                     rand_quals  = np.random.choice(list(read.qual),sample_size)
@@ -785,7 +817,7 @@ class ReadStatsFactory(object):
 
             return results
 
-        structures = {"read_array":{"data":np.zeros((2,6)),
+        structures = {"read_array":{"data":np.zeros((2,8)),
                                     "store_method":"vstack"},
                      "mima_counts":{"data":np.zeros(matrix_shape),
                                     "store_method":"cumu"},
