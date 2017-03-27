@@ -556,8 +556,10 @@ class ReadStatsFactory(object):
         read_model = readmodel.get_read_model(sample_stats,
                                               read_stats,
                                               self._total_procs)
-
+        pdb.set_trace()
         read_counts = self.read_stats_to_counts(read_stats, read_model)
+
+
         read_counts["sample_variance"] = 3
         # self.__delete_analysis_paths__(read_stats_path)
         return read_counts

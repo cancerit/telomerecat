@@ -47,6 +47,18 @@ class Distribution(object):
     def bootstrap(self, observed_dist, lo, hi):
         pass
 
+class Poisson(Distribution):
+    def __init__(self, params=None, observed_dist=None, lo=None, hi=None):
+        super(Poisson, self).__init__(params, observed_dist, lo, hi)
+
+    def simulate(self, lo_limit=0, hi_limit=100):
+        data = np.random.exponential(self.params["shape"][0],
+                                     self.params["count"])
+        return data
+    
+    def bootstrap(self, observed_dist, lo, hi):
+        param1 = np.random.uniform(0, 10)
+        self.params["shape"] = [param1]
 
 class Exponential(Distribution):
 
@@ -125,7 +137,7 @@ class Normal(Distribution):
 
     def bootstrap(self, observed_dist, lo, hi):
         dat = self.dist_to_dat(observed_dist[lo:hi], offset=lo)
-        self.params["shape"] = [dat.mean(), dat.std()]
+        self.params["shape"] = [dat.mean(), dat.std()*5]
 
 
 class Solution(object):
@@ -147,12 +159,12 @@ class Solution(object):
         twenty_percent = int(read_len * .2)
         fifty_percent = int(read_len * .5)
 
-        self.distributions["atelo"] = Beta(observed_dist=observed_dist,
-                                           lo=0,
+        self.distributions["atelo"] = Poisson(observed_dist=observed_dist,
+                                           lo=1,
                                            hi=twenty_percent)
 
         self.distributions["subtelo"] = Uniform(observed_dist=observed_dist,
-                                                lo=twenty_percent,
+                                                lo=ten_percent,
                                                 hi=fifty_percent)
 
         self.distributions["nontelo"] = Normal(observed_dist=observed_dist,
@@ -302,7 +314,7 @@ class TelomereReadModel(object):
     def __compare_dists__(self, observed, simulated):
 
         # change = ( np.log2(observed+0.0001) - np.log2(simulated+0.0001) ) **2
-        dif = (observed[:40] - simulated[:40])**2
+        dif = (observed[1:40] - simulated[1:40])**2
         # score = dif.sum() * change.sum()
         return int(dif.sum())
 
@@ -357,12 +369,12 @@ class TelomereReadModel(object):
             if no_change == 100:
                 converged = True
 
-            # if iteration % 10 == 0:
-            #     best_solution.print_params()
-            #     print "%d:: its:%d chg:%d scr:%d" % (self.job_id,
-            #                                          iteration,
-            #                                          no_change,
-            #                                          best_solution.score)
+            if iteration % 10 == 0:
+                best_solution.print_params()
+                print "%d:: its:%d chg:%d scr:%d" % (self.job_id,
+                                                     iteration,
+                                                     no_change,
+                                                     best_solution.score)
 
             iteration += 1
 
