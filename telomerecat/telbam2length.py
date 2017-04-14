@@ -334,9 +334,9 @@ class MismatchingLociLogic(object):
             return
 
         if reverse:
-            generator = reverse_gen(seq, pattern) 
-        else: 
-            generator = forward_gen(seq, pattern) 
+            generator = reverse_gen(seq, pattern)
+        else:
+            generator = forward_gen(seq, pattern)
 
         return generator
 
@@ -385,19 +385,14 @@ class MismatchingLociLogic(object):
 
 class VitalStatsFinder(object):
 
-    def __init__(self,temp_dir,total_procs,task_size,trim_length=0):
+    def __init__(self, temp_dir, total_procs, task_size, trim_length=0):
         self.temp_dir = temp_dir
         self._total_procs = total_procs
         self._task_size = task_size
         self._trim_length = trim_length
 
-    def __csv_to_dict__(self,stats_path):
-        insert_dat = np.genfromtxt(stats_path,delimiter=",",
-                                names=True,dtype=("S256",float,float,
-                                                         float,float,
-                                                         float,float,
-                                                         float,float,
-                                                         float))
+    def __csv_to_dict__(self, stats_path):
+        insert_dat = pd.read_csv(stats_path).to_dict(orient="record")[0]
 
         ins_N = int(insert_dat['N'])
         if ins_N == 0:
@@ -407,29 +402,30 @@ class VitalStatsFinder(object):
             ins_sum = int(insert_dat['sum'])
             ins_power_2 = int(insert_dat['power_2'])
 
-            insert_mean,insert_sd = \
+            insert_mean, insert_sd = \
                         self.__get_mean_and_sd__(ins_sum, ins_power_2, ins_N)
     
         min_qual = int(insert_dat['min_qual'])
-        qual_mean,qual_sd = self.__get_mean_and_sd__(insert_dat["qual_sum"],
-                                                    insert_dat["qual_power_2"],
-                                                    insert_dat["qual_N"])
+        qual_mean, qual_sd = \
+                self.__get_mean_and_sd__(insert_dat["qual_sum"],
+                                         insert_dat["qual_power_2"],
+                                         insert_dat["qual_N"])
 
-        return {"insert_mean":insert_mean, 
+        return {"insert_mean": insert_mean,
                 "insert_sd": insert_sd,
-                "min_qual":min_qual,
-                "max_qual":int(insert_dat['max_qual']),
-                "read_len":int(insert_dat['read_len']),
-                "qual_mean":qual_mean,
-                "qual_sd":qual_sd}
+                "min_qual": min_qual,
+                "max_qual": int(insert_dat['max_qual']),
+                "read_len": int(insert_dat['read_len']),
+                "qual_mean": qual_mean,
+                "qual_sd": qual_sd}
 
-    def __get_mean_and_sd__(self,x_sum,x_power_2,x_N):
+    def __get_mean_and_sd__(self, x_sum, x_power_2, x_N):
         x_mean = x_sum / x_N
-        x_sd = np.sqrt( (x_N * x_power_2) - x_sum**2) / x_N
+        x_sd = np.sqrt((x_N * x_power_2) - x_sum**2) / x_N
 
-        return x_mean,x_sd
+        return x_mean, x_sd
 
-    def get_vital_stats(self,sample_path):
+    def get_vital_stats(self, sample_path):
 
         vital_stats_csv = self.__run_vital_rule__(sample_path)
         vital_stats = self.__csv_to_dict__(vital_stats_csv)
@@ -437,23 +433,22 @@ class VitalStatsFinder(object):
         vital_stats["initial_read_len"] = vital_stats["read_len"]
 
         if self._trim_length > 0:
-            vital_stats["read_len"] = self._trim_length 
+            vital_stats["read_len"] = self._trim_length
  
         return vital_stats
 
-    def __run_vital_rule__(self,sample_path,keep_in_temp=True):
-        def rule(read,constants,master):
+    def __run_vital_rule__(self, sample_path, keep_in_temp=True):
+        def rule(read, constants, master):
             stats = {}
 
-            hash_count = read.qual.count("#")
             if read.is_read1 and read.is_proper_pair and read.mapq > 38:
                 insert_size = abs(read.template_length)
                 stats["sum"] = insert_size
                 stats["power_2"] = insert_size**2
                 stats["N"] = 1
             
-            stats["read_len"] =  len(read.seq)
-            byte_vals = map(ord,read.qual)
+            stats["read_len"] = len(read.seq)
+            byte_vals = map(ord, read.qual)
             min_qual = min(byte_vals)
             max_qual = max(byte_vals)
 
@@ -469,28 +464,28 @@ class VitalStatsFinder(object):
 
         structures = {}
 
-        structures["sum"] = {"data":0,"store_method":"cumu"}
-        structures["power_2"] = {"data":0,"store_method":"cumu"}
-        structures["N"] = {"data":0,"store_method":"cumu"}
-        structures["read_len"] = {"data":0,"store_method":"max"}
+        structures["sum"] = {"data": 0, "store_method": "cumu"}
+        structures["power_2"] = {"data": 0, "store_method": "cumu"}
+        structures["N"] = {"data": 0, "store_method": "cumu"}
+        structures["read_len"] = {"data": 0, "store_method": "max"}
 
-        structures["min_qual"] = {"data":999,"store_method":"min"}
-        structures["max_qual"] = {"data":0,"store_method":"max"}
+        structures["min_qual"] = {"data": 999, "store_method": "min"}
+        structures["max_qual"] = {"data": 0, "store_method": "max"}
 
 
-        structures["qual_sum"] = {"data":0,"store_method":"cumu"}
-        structures["qual_power_2"] = {"data":0,"store_method":"cumu"}    
-        structures["qual_N"] = {"data":0,"store_method":"cumu"}  
+        structures["qual_sum"] = {"data": 0, "store_method": "cumu"}
+        structures["qual_power_2"] = {"data": 0, "store_method": "cumu"}
+        structures["qual_N"] = {"data": 0, "store_method": "cumu"}
 
         stat_interface = parabam.Stat(temp_dir=self.temp_dir,
-                                      total_procs = self._total_procs,
-                                      task_size = 10000,
+                                      total_procs=self._total_procs,
+                                      task_size=10000,
                                       keep_in_temp=keep_in_temp)
 
-        out_paths = stat_interface.run(input_paths= [sample_path],
-                                       constants = {},
-                                       rule = rule,
-                                       struc_blueprint = structures)
+        out_paths = stat_interface.run(input_paths=[sample_path],
+                                       constants={},
+                                       rule=rule,
+                                       struc_blueprint=structures)
 
         return out_paths["global"]["stats"]
 
@@ -529,61 +524,70 @@ class ReadStatsFactory(object):
         for analysis, path in read_stat_paths.items():
             os.remove(path)
 
-    def __paths_to_error_profile__(self,read_stat_paths):
+    def __paths_to_error_profile__(self, read_stat_paths):
         random_counts = pd.read_csv(read_stat_paths["random_counts"],
-                                    header=None).values 
+                                    header=None).values
         read_counts = pd.read_csv(read_stat_paths["mima_counts"],
-                                  header=None).values 
-        error_profile = self.__array_to_profile__(read_counts, random_counts)
+                                  header=None).values
+        error_profile = self.get_error_profile(read_counts, random_counts)
         sample_variance = self.__get_sample_variance__(read_counts)
         
         return error_profile, sample_variance
 
     def __get_sample_variance__(self, read_counts):
-        read_counts[0,:] = 0
+        read_counts[0, :] = 0
         mask = read_counts > 0
-        mask[40:,:] = False
+        mask[40:, :] = False
 
         read_variance = (read_counts[mask].std() / read_counts[mask].mean())
         return read_variance
 
-    def __array_to_profile__(self,read_counts,random_counts, thresh = None):
+    def get_error_profile(self, read_counts, random_counts, thresh=None):
+        error_profile = self.__get_significantly_enriched__(read_counts,
+                                                            random_counts,
+                                                            thresh)
+
+        error_profile = self.__remove_noise__(error_profile)
+        error_profile = self.__prune_error_profile__(error_profile)
+        error_profile = self.__rationalise_error_profile__(error_profile)
+
+        error_profile[:int(read_counts.shape[0] * .1), :] = 1
+
+        return error_profile
+
+    def __get_significantly_enriched__(self, read_counts,
+                                             random_counts,
+                                             thresh=None):
         dif_counts = read_counts - random_counts
         ten_percent = int(read_counts.shape[0] * .1)
 
         if thresh is None:
             mask = self.__get_exclusion_mask__(read_counts)
             arg_max_index = (read_counts * mask).argmax()
-            dif_loci_x,dif_loci_y = np.unravel_index(arg_max_index,
-                                                     dif_counts.shape)
+            dif_loci_x, dif_loci_y = np.unravel_index(arg_max_index,
+                                                      dif_counts.shape)
 
-            hi_thresh = dif_counts[int(dif_loci_x-ten_percent):\
-                                  int(dif_loci_x+ten_percent),
-                                  dif_loci_y-15:\
-                                  dif_loci_y+1]
+            hi_thresh = dif_counts[int(dif_loci_x - ten_percent):
+                                   int(dif_loci_x + ten_percent),
+                                   dif_loci_y - 15:
+                                   dif_loci_y + 1]
             hi_thresh = hi_thresh.flatten()
 
-            thresh = np.percentile(hi_thresh,95)
+            thresh = np.percentile(hi_thresh, 95)
 
         if self._debug_print:
-            print 'Thresh:',thresh
+            print 'Thresh:', thresh
 
-        error_profile = (dif_counts * (dif_counts > 0))\
-                                 > thresh
-
-        error_profile = self.__remove_noise__(error_profile)
-        error_profile = self.__prune_error_profile__(error_profile)
-        error_profile = self.__rationalise_error_profile__(error_profile)
-
-        error_profile[:ten_percent,:] = 1
+        error_profile = (dif_counts * (dif_counts > 0)) > thresh
+        error_profile = error_profile * 1
 
         return error_profile
 
     def __remove_noise__(self, error_profile):
         row_max, col_max = error_profile.shape
-        error_profile[int(row_max*.11):,int(col_max*.7):] = 0
-        error_profile[int(row_max*.35):,0] = 0
-        error_profile[int(row_max*.55):,:] = 0 
+        error_profile[int(row_max * .11):, int(col_max * .7):] = 0
+        error_profile[int(row_max * .35):, 0] = 0
+        error_profile[int(row_max * .55):, :] = 0
 
         return error_profile
 
@@ -591,50 +595,53 @@ class ReadStatsFactory(object):
         mask = np.zeros(read_counts.shape)
         x_start = int(read_counts.shape[0] * .2)
         y_start = int(read_counts.shape[1] * .5)
-        mask[x_start:,y_start:] = 1
+        mask[x_start:, y_start:] = 1
         return mask
 
     def __prune_error_profile__(self, error_profile):
         first_locis = self.__get_first_loci__(error_profile)
         prune_mask = np.ones(error_profile.shape)
-        for row_i in xrange(1,error_profile.shape[0]):
+        for row_i in xrange(1, error_profile.shape[0]):
             if first_locis[row_i] == -1:
-                continue 
+                continue
             else:
                 for col_i in xrange(error_profile.shape[1]):
-                    if (not error_profile[row_i,col_i]) or \
-                        col_i == 0:
-                            continue
-                    elif self.__prune_decision__(row_i,col_i,error_profile):
-                        prune_mask[row_i,col_i] = 0
+                    if (not error_profile[row_i, col_i]) or \
+                            col_i == 0:
+                        continue
+                    elif self.__prune_decision__(row_i, col_i, error_profile):
+                        prune_mask[row_i, col_i] = 0
         return error_profile * prune_mask
 
     def __prune_decision__(self, row_i, col_i, error_profile):
+        neighbours = [(row_i - 1, col_i + 1),
+                      (row_i - 1, col_i),
+                      (row_i - 1, col_i - 1),
+                      (row_i, col_i + 1),
+                      (row_i, col_i - 1),
+                      (row_i + 1, col_i + 1),
+                      (row_i + 1, col_i),
+                      (row_i + 1, col_i - 1), ]
+
         try:
-            return self.__get_neighbor_sum__(row_i,col_i,error_profile) < 4
+            return self.__get_neighbor_sum__(row_i,
+                                             col_i,
+                                             error_profile,
+                                             neighbours) < 4
         except IndexError:
             return False
 
-    def __get_neighbor_sum__(self,row_i, col_i, error_profile):
+    def __get_neighbor_sum__(self, row_i, col_i, error_profile, neighbours):
 
-        neighbours = [(row_i-1,col_i+1),
-                      (row_i-1,col_i),
-                      (row_i-1,col_i-1),
-                      (row_i,col_i+1),
-                      (row_i,col_i-1),
-                      (row_i+1,col_i+1),
-                      (row_i+1,col_i),
-                      (row_i+1,col_i-1),]
-
-        neighbours_sum = sum([ error_profile[r,c] for (r,c) in neighbours])
+        neighbours_sum = sum([error_profile[r, c] for (r, c) in neighbours])
         return neighbours_sum
 
-    def __get_first_loci__(self,error_profile):
+    def __get_first_loci__(self, error_profile):
         first_loci = []
         for row_i in xrange(error_profile.shape[0]):
-            if any(error_profile[row_i,:]):
+            if any(error_profile[row_i, :]):
                 for col_i in xrange(error_profile.shape[1]):
-                    if error_profile[row_i,col_i]:
+                    if error_profile[row_i, col_i]:
                         first_loci.append(col_i)
                         break
             else:
@@ -800,22 +807,22 @@ class Telbam2Length(TelomerecatInterface):
                  announce=True,
                  cmd_run=False):
 
-        super(Telbam2Length,self).__init__(instance_name = \
+        super(Telbam2Length,self).__init__(instance_name=\
                                             "telomerecat telbam2length", 
-                                        temp_dir=temp_dir,
-                                        task_size=task_size,
-                                        total_procs=total_procs,
-                                        reader_n=reader_n,
-                                        verbose=verbose,
-                                        announce = announce,
-                                        cmd_run=cmd_run)
+                                            temp_dir=temp_dir,
+                                            task_size=task_size,
+                                            total_procs=total_procs,
+                                            reader_n=reader_n,
+                                            verbose=verbose,
+                                            announce=announce,
+                                            cmd_run=cmd_run)
 
     def run_cmd(self):
-        self.run(input_paths = self.cmd_args.input,
-                 trim = self.cmd_args.trim,
-                 inserts_path = self.cmd_args.insert,
-                 correct_f2a = not self.cmd_args.disable_correction,
-                 output_path = self.cmd_args.output)
+        self.run(input_paths=self.cmd_args.input,
+                 trim=self.cmd_args.trim,
+                 inserts_path=self.cmd_args.insert,
+                 correct_f2a=not self.cmd_args.disable_correction,
+                 output_path=self.cmd_args.output)
 
     def run(self,input_paths,
                  trim = 0,
