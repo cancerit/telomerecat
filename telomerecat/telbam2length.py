@@ -876,6 +876,8 @@ class Telbam2Length(TelomerecatInterface):
                                                        self.total_procs,
                                                        trim)
 
+            print read_type_counts
+
             self.__write_to_csv__(read_type_counts,
                                     vital_stats,
                                     temp_csv_path,
