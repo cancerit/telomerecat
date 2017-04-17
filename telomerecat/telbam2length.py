@@ -491,11 +491,12 @@ class VitalStatsFinder(object):
 
 class ReadStatsFactory(object):
 
-    def __init__(self,temp_dir,
-                      total_procs=4,
-                      task_size = 5000,
-                      trim_reads = 0,
-                      debug_print=False):
+    def __init__(self,
+                 temp_dir,
+                 total_procs=4,
+                 task_size=5000,
+                 trim_reads=0,
+                 debug_print=False):
 
         self.temp_dir = temp_dir
         self._total_procs = total_procs
@@ -504,7 +505,7 @@ class ReadStatsFactory(object):
         self._debug_print = debug_print
         self._trim = trim_reads
 
-    def get_read_counts(self,path,vital_stats):
+    def get_read_counts(self, path, vital_stats):
         read_stat_paths = self.run_read_stat_rule(path, vital_stats)
 
         read_array = self.__path_to_read_array__(read_stat_paths["read_array"])
@@ -599,19 +600,60 @@ class ReadStatsFactory(object):
         return mask
 
     def __prune_error_profile__(self, error_profile):
+        
+        isolated_mask = self.__get_isolated_mask__(error_profile)
+        continuous_mask = self.__get_continuous_mask__(error_profile)
+
+        combined_mask = ((isolated_mask + continuous_mask) > 0)
+
+        return error_profile * combined_mask
+
+    def __get_continuous_mask__(self, error_profile):
+        row_continuous = self.__transform_continous_matrix__(error_profile)
+        col_continuous = self.__transform_continous_matrix__(
+            error_profile.transpose())
+        col_continuous = col_continuous.transpose()
+
+        max_continuous = row_continuous * (row_continuous > col_continuous)
+        max_continuous = max_continuous + \
+                        (col_continuous * (col_continuous >= row_continuous))
+
+        continusous_mask = max_continuous >= 4
+        return continusous_mask
+
+    def __transform_continous_matrix__(self, error_profile):
+        continuous = np.zeros(error_profile.shape)
+
+        for row_i in xrange(0, error_profile.shape[0]):
+            sequence = 0
+            start_index = -1
+            for col_i in xrange(0, error_profile.shape[1]):
+                value = error_profile[row_i, col_i]
+                if value == 0:
+                    if sequence > 0:
+                        continuous[row_i, start_index:col_i] = sequence
+                        sequence = 0
+                        start_index = -1
+                elif value > 0:
+                    if start_index == -1:
+                        start_index = col_i
+                    sequence += 1
+        return continuous
+
+    def __get_isolated_mask__(self, error_profile):
+        isolated_mask = np.ones(error_profile.shape)
         first_locis = self.__get_first_loci__(error_profile)
-        prune_mask = np.ones(error_profile.shape)
         for row_i in xrange(1, error_profile.shape[0]):
             if first_locis[row_i] == -1:
+                # skip rows with no entries
                 continue
             else:
                 for col_i in xrange(error_profile.shape[1]):
-                    if (not error_profile[row_i, col_i]) or \
-                            col_i == 0:
+                    if (not error_profile[row_i, col_i]) or col_i == 0:
                         continue
                     elif self.__prune_decision__(row_i, col_i, error_profile):
-                        prune_mask[row_i, col_i] = 0
-        return error_profile * prune_mask
+                        isolated_mask[row_i, col_i] = 0
+        return isolated_mask
 
     def __prune_decision__(self, row_i, col_i, error_profile):
         neighbours = [(row_i - 1, col_i + 1),
@@ -632,7 +674,6 @@ class ReadStatsFactory(object):
             return False
 
     def __get_neighbor_sum__(self, row_i, col_i, error_profile, neighbours):
-
         neighbours_sum = sum([error_profile[r, c] for (r, c) in neighbours])
         return neighbours_sum
 
@@ -649,29 +690,30 @@ class ReadStatsFactory(object):
         return first_loci
 
     def __rationalise_error_profile__(self, error_profile):
-        start_row = np.where(error_profile)[0].max()
-        global_loci = 0
-        for i in reversed(xrange(0,start_row+1)):
-            error_bins_in_row = np.where(error_profile[i,:])[0]
-            if len(error_bins_in_row) > 0:
-                cur_loci = error_bins_in_row.max()
-            else:
-                cur_loci = 0
+        if error_profile.sum() > 0:
+            start_row = np.where(error_profile)[0].max()
+            global_loci = 0
+            for i in reversed(xrange(0, start_row + 1)):
+                error_bins_in_row = np.where(error_profile[i, :])[0]
+                if len(error_bins_in_row) > 0:
+                    cur_loci = error_bins_in_row.max()
+                else:
+                    cur_loci = 0
 
-            #if cur_loci > global_loci:
-            global_loci = cur_loci
-            error_profile[i,:global_loci+1] = True
+                # if cur_loci > global_loci:
+                global_loci = cur_loci
+                error_profile[i, :global_loci + 1] = True
         
         return error_profile
 
-    def __array_to_file__(self,array,unique):
+    def __array_to_file__(self, array, unique):
         df = pd.DataFrame(array)
         out_path = "./%s-tmctout.csv" % (unique)
-        df.to_csv(out_path,index=False,header=False)
+        df.to_csv(out_path, index=False, header=False)
         return out_path
 
-    def __path_to_read_array__(self,read_array_path):
-        return pd.read_csv(read_array_path,header=None).values
+    def __path_to_read_array__(self, read_array_path):
+        return pd.read_csv(read_array_path, header=None).values
 
     def read_array_to_counts(self, read_array, error_profile, sample_variance):
         complete_reads,boundary_reads = \
@@ -687,25 +729,21 @@ class ReadStatsFactory(object):
 
         return return_dat
 
-    def __get_f1_count__(self,complete_reads):
+    def __get_f1_count__(self, complete_reads):
         return float(complete_reads.shape[0]) / 2
 
-    def __get_boundary_counts__(self,boundary_reads):
-        f2_count,f4_count,total_reads = \
-                 self.__get_read_counts__(boundary_reads)
-
-        observed_f2a_ratio = (f2_count-f4_count) / float(total_reads)
-        observed_f2a_weight = f2_count
-            
+    def __get_boundary_counts__(self, boundary_reads):
+        f2_count, f4_count, total_reads = \
+            self.__get_read_counts__(boundary_reads)
         return f2_count, f4_count
 
-    def __get_read_counts__(self,boundary_reads):
-        f2_count = sum(boundary_reads[:,3] == 1)
-        f4_count = sum(boundary_reads[:,3] == 0)
+    def __get_read_counts__(self, boundary_reads):
+        f2_count = sum(boundary_reads[:, 3] == 1)
+        f4_count = sum(boundary_reads[:, 3] == 0)
         total_reads = boundary_reads.shape[0]
-        return f2_count,f4_count,total_reads
+        return f2_count, f4_count, total_reads
         
-    def __get_complete_status__(self,read_array,error_profile):
+    def __get_complete_status__(self, read_array, error_profile):
         boundary_indicies = []
         complete_indicies = []
 
@@ -769,17 +807,17 @@ class ReadStatsFactory(object):
                     random_counts[int(sample_size),int(rand_avg)] += 1
 
             results = {"read_array":np.array(return_dat),
-                      "random_counts":random_counts,
-                      "mima_counts":mima_counts}
+                       "random_counts":random_counts,
+                       "mima_counts":mima_counts}
 
             return results
 
-        structures = {"read_array":{"data":np.zeros((2,6)),
-                                    "store_method":"vstack"},
-                     "mima_counts":{"data":np.zeros(matrix_shape),
-                                    "store_method":"cumu"},
-                     "random_counts":{"data":np.zeros(matrix_shape),
-                                    "store_method":"cumu"},}
+        structures = {"read_array": {"data": np.zeros((2, 6)),
+                                     "store_method": "vstack"},
+                      "mima_counts": {"data": np.zeros(matrix_shape),
+                                      "store_method": "cumu"},
+                      "random_counts": {"data": np.zeros(matrix_shape),
+                                        "store_method": "cumu"}, }
 
         stat_interface = parabam.Stat(temp_dir=self.temp_dir,
                                       pair_process=True,
@@ -824,13 +862,13 @@ class Telbam2Length(TelomerecatInterface):
                  correct_f2a=not self.cmd_args.disable_correction,
                  output_path=self.cmd_args.output)
 
-    def run(self,input_paths,
-                 trim = 0,
-                 output_path = None,
-                 correct_f2a = True,
-                 inserts_path = None):
+    def run(self, input_paths,
+                  trim=0,
+                  output_path=None,
+                  correct_f2a=True,
+                  inserts_path=None):
         
-        """The main function for invoking the part of the 
+        """The main function for invoking the part of the
            program which creates a telbam from a bam
 
         Arguments:
@@ -854,10 +892,10 @@ class Telbam2Length(TelomerecatInterface):
         self.__output__(" Collecting meta-data for all samples | %s\n" \
                             % (self.__get_date_time__(),),1)
 
-        vital_stats_finder = VitalStatsFinder(self.temp_dir, 
-                                        self.total_procs,
-                                        self.task_size,
-                                        trim)
+        vital_stats_finder = VitalStatsFinder(self.temp_dir,
+                                              self.total_procs,
+                                              self.task_size,
+                                              trim)
 
         for sample_path,sample_name, in izip(input_paths,names):
             sample_intro = "\t- %s | %s\n" % (sample_name, 
@@ -971,15 +1009,15 @@ class Telbam2Length(TelomerecatInterface):
                          name):
         with open(output_csv_path,"a") as counts:
             counts.write("%s,%d,%d,%d,%.3f,%.3f,%.3f,%d,%d\n" %\
-                (name,
-                read_type_counts["F1"],
-                read_type_counts["F2"],
-                read_type_counts["F4"],
-                read_type_counts["sample_variance"],
-                vital_stats["insert_mean"],
-                vital_stats["insert_sd"],
-                vital_stats["read_len"],
-                vital_stats["initial_read_len"]))
+                                        (name,
+                                         read_type_counts["F1"],
+                                         read_type_counts["F2"],
+                                         read_type_counts["F4"],
+                                         read_type_counts["sample_variance"],
+                                         vital_stats["insert_mean"],
+                                         vital_stats["insert_sd"],
+                                         vital_stats["read_len"],
+                                         vital_stats["initial_read_len"]))
 
     def get_parser(self):
         parser = self.default_parser()
