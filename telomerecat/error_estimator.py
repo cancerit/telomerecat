@@ -149,12 +149,12 @@ class Sequence(object):
     def __get_offset_locus__(self, read, base_index, offset):
         return (read.pos - offset) + base_index
 
-    def print_base_segments(self, base_id, surround = 3):
+    def print_base_segments(self, base_id, surround=3):
         for record in self.sequence[base_id].read_records:
             read = self.reads[record.read_id]
             base_id = record.base_id
-            left_flank = read.seq[base_id-surround:base_id]
-            right_flank = read.seq[base_id+1:base_id+1+surround]
+            left_flank = read.seq[base_id - surround:base_id]
+            right_flank = read.seq[base_id + 1: base_id + 1 + surround]
 
             left_flank_qual = read.qual[base_id-surround:base_id]
             right_flank_qual = read.qual[base_id+1:base_id+1+surround]
@@ -193,19 +193,19 @@ class Sequence(object):
                                 pass
         return nucleotide_changes
 
-    def __test_bases__(self,prev_base, base, next_base, thresh = .8):
+    def __test_bases__(self, prev_base, base, next_base, thresh=.8):
         return base.observations >= 5 and \
-                base.most_common_freq != 1  and \
-                 base.most_common_freq >= thresh and \
-                  prev_base.most_common_freq >= thresh and \
-                    prev_base.most_common_freq >= thresh
+            base.most_common_freq != 1 and \
+            base.most_common_freq >= thresh and \
+            prev_base.most_common_freq >= thresh and \
+            prev_base.most_common_freq >= thresh
 
     def populate_error_matricies(self, correct, error):
 
         for i, base in enumerate(self.sequence):
-            if base.observations >=5 and \
-                base.most_common_freq >= .8 and \
-                 base.most_common_freq != 1:
+            if base.observations >= 5 and \
+                    base.most_common_freq >= .8 and \
+                    base.most_common_freq != 1:
 
                 base_records = base.get_sorted_base_records()
                 most_common = base_records[-1]
@@ -243,11 +243,12 @@ class ScanBam(object):
         bad_base_ratios = []
         read_counts = []
         insert_lengths = []
+        duplicate_counts = []
 
         while sample_count < 300:
             chrm_name, chrm_len = random.sample(references, 1)[0]
             if chrm_len > (10 ** 7 * 5):
-                random_location = random.randint(0, chrm_len-5000000)
+                random_location = random.randint(0, chrm_len - 5000000)
 
                 region = "%s:%d-%d" % (chrm_name,
                                        random_location,
@@ -263,28 +264,37 @@ class ScanBam(object):
                     sequence = Sequence(reads)
 
                     unmapped = 0
+                    duplicate = 0
                     for read in sequence.reads:
                         unmapped += int(read.is_unmapped)
-                        if read.is_proper_pair and read.mapq > 38 and read.is_read1:
+                        if (read.is_proper_pair and
+                             read.mapq > 38 and
+                             read.is_read1):
                             insert_lengths.append(abs(read.template_length))
+                        if read.is_duplicate:
+                            duplicate += 1
 
                     error_bases = sequence.error_ratio()
 
-                    bad_base_ratio = (len(reads)*read_len) / float(error_bases+(unmapped*read_len))
+                    bad_base_ratio = ((len(reads) * read_len) /
+                                            float(error_bases +
+                                                    (unmapped * read_len)))
                     bad_base_ratios.append(bad_base_ratio)
+                    duplicate_counts.append(duplicate)
 
         bam_file.close()
-        return read_counts, bad_base_ratios, insert_lengths
+        return read_counts, bad_base_ratios, insert_lengths, duplicate_counts
 
     def get_reads(self, bam_file, region):
         all_reads = []
-        for read in bam_file.fetch(region = region):
+        for read in bam_file.fetch(region=region):
             all_reads.append(read)
         return all_reads
 
-def modify_telbam_header(telbam_path, 
-                         read_counts, 
-                         bad_base_ratios, 
+
+def modify_telbam_header(telbam_path,
+                         read_counts,
+                         bad_base_ratios,
                          temp_dir_path):
 
     telbam_file = pysam.AlignmentFile(telbam_path, "rb")
@@ -292,16 +302,20 @@ def modify_telbam_header(telbam_path,
     if "CO" not in telbam_header.keys():
         telbam_header["CO"] = []
 
-    error_est_string = "telomerecat_error_ratio:%.3f,%.3f,%.3f" % (np.mean(bad_base_ratios),
-                                                                   np.median(bad_base_ratios),
-                                                                   np.std(bad_base_ratios))
-    error_count_string = "telomerecat_error_counts:%.3f,%.3f,%.3f" % (np.mean(read_counts),
-                                                                   np.median(read_counts),
-                                                                   np.std(read_counts))
+    error_est_string = \
+        "telomerecat_error_ratio:%.3f,%.3f,%.3f" % (np.mean(bad_base_ratios),
+                                                    np.median(bad_base_ratios),
+                                                    np.std(bad_base_ratios))
+    error_count_string = \
+        "telomerecat_error_counts:%.3f,%.3f,%.3f" % (np.mean(read_counts),
+                                                     np.median(read_counts),
+                                                     np.std(read_counts))
     telbam_header["CO"].extend((error_est_string, error_count_string))
 
-    temp_telbam_path = os.path.join(temp_dir_path,"temp_dir_path_%d.bam" % (time.time(),))
-    temp_telbam_file = pysam.AlignmentFile(temp_telbam_path,"wb",header=telbam_header)
+    temp_telbam_path = os.path.join(temp_dir_path,
+                                    "temp_dir_path_%d.bam" % (time.time(),))
+    temp_telbam_file = pysam.AlignmentFile(temp_telbam_path,
+                                           "wb", header=telbam_header)
 
     for read in telbam_file.fetch(until_eof=True):
         temp_telbam_file.write(read)
@@ -311,21 +325,25 @@ def modify_telbam_header(telbam_path,
 
     os.rename(temp_telbam_path, telbam_path)
 
-def add_error_to_telbam_header(bam_path, telbam_path, temp_dir_path):
-    read_counts,bad_base_ratios,insert_lengths = ScanBam().scan(bam_path)
 
-    modify_telbam_header(telbam_path, 
-                         read_counts, 
-                         bad_base_ratios, 
+def add_error_to_telbam_header(bam_path, telbam_path, temp_dir_path):
+    read_counts, bad_base_ratios, insert_lengths = ScanBam().scan(bam_path)
+
+    modify_telbam_header(telbam_path,
+                         read_counts,
+                         bad_base_ratios,
                          temp_dir_path)
 
+
 def print_diagnostics(bam_path):
-    read_counts, bad_base_ratios, insert_lengths = ScanBam().scan(bam_path)
+    read_counts, bad_base_ratios, insert_lengths, duplicate_counts \
+        = ScanBam().scan(bam_path)
 
     print_list(read_counts)
     print_list(bad_base_ratios)
-
     print_list(insert_lengths)
+    print_list(duplicate_counts)
+
 
 def print_list(for_print):
     print np.mean(for_print), np.median(for_print), np.std(for_print)
