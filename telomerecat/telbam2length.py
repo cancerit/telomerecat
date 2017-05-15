@@ -11,7 +11,7 @@ import pandas as pd
 
 from shutil import copy
 from itertools import izip
-from collections import namedtuple,Counter
+from collections import namedtuple, Counter
 from pprint import pprint
 
 from telomerecat import Csv2Length
@@ -19,17 +19,18 @@ from telomerecat.core import TelomerecatInterface
 
 ######################################################################
 ##
-##      Create a length estimate given a set of TELBAMS 
+##      Create a length estimate given a set of TELBAMS
 ##
 ##      Author: jhrf
 ##
 ######################################################################
 
+
 class SimpleReadFactory(object):
 
     def __init__(self, vital_stats=None, trim_reads=0):
-        self._SimpleRead = namedtuple("SimpleRead","seq qual" +
-                                      " five_prime pattern mima_loci n_loci"+
+        self._SimpleRead = namedtuple("SimpleRead", "seq qual" +
+                                      " five_prime pattern mima_loci n_loci" +
                                       " avg_qual")
 
         if vital_stats:
@@ -40,24 +41,26 @@ class SimpleReadFactory(object):
             self._phred_offset = 33
 
         self._trim_reads = trim_reads
-        self._compliments = {"A":"T","T":"A",
-                             "C":"G","G":"C",
-                             "N":"N"}
+        self._compliments = {"A": "T",
+                             "T": "A",
+                             "C": "G",
+                             "G": "C",
+                             "N": "N"}
 
         self.mima_logic = MismatchingLociLogic()
 
-    def get_simple_read(self,read):
-        seq,qual = self.__flip_and_compliment__(read)
+    def get_simple_read(self, read):
+        seq, qual = self.__flip_and_compliment__(read)
         if self._trim_reads > 0:
-            seq,qual = (seq[:self._trim_reads],
-                        qual[:self._trim_reads])
+            seq, qual = (seq[:self._trim_reads],
+                         qual[:self._trim_reads])
 
-        (mima_loci,frameshift_loci),pattern = \
-                self.mima_logic.get_telo_mismatch(seq)
+        (mima_loci, frameshift_loci), pattern = \
+                self.mima_logic.get_telo_mismatch(seq, qual)
 
-        avg_qual,n_loci = self.__get_phred_score__(qual, 
-                                                   mima_loci, 
-                                                   frameshift_loci)
+        avg_qual, n_loci = self.__get_phred_score__(qual,
+                                                    mima_loci,
+                                                    frameshift_loci)
 
         simple_read = self._SimpleRead(
             seq,
@@ -67,6 +70,8 @@ class SimpleReadFactory(object):
             mima_loci,
             n_loci,
             avg_qual)
+
+        #self.mima_logic.print_mima(seq, qual, pattern)
 
         return simple_read
 
@@ -80,26 +85,27 @@ class SimpleReadFactory(object):
         for start, end in frameshift_loci:
             fuse_phreds = []
 
-            for i in xrange(start,end):
+            for i in xrange(start, end):
                 if i in mima_loci:
                     remove_mimas.append(i)
-                fuse_phreds.append(ord(qual[i])-self._phred_offset)
+                fuse_phreds.append(ord(qual[i]) - self._phred_offset)
 
             phreds.append(min(fuse_phreds))
 
         for loci in mima_loci:
             if loci not in remove_mimas:
-                phreds.append(ord(qual[loci])-self._phred_offset)
+                phreds.append(ord(qual[loci]) - self._phred_offset)
 
         return np.mean(phreds), len(phreds)
 
-    def __get_average_qual__(self,qual,mima_loci):
+    def __get_average_qual__(self, qual, mima_loci):
         if len(mima_loci) == 0:
             return 0
-        phreds = np.array([ord(qual[i])-self._phred_offset for i in mima_loci])
+        phreds = np.array([ord(qual[i]) - self._phred_offset
+                          for i in mima_loci])
         return np.mean(phreds)
 
-    def __trim_seq__(self,seq,qual):
+    def __trim_seq__(self, seq, qual):
         cutoff = 0
         min_sequence = 0
         for q in qual:
@@ -115,47 +121,48 @@ class SimpleReadFactory(object):
 
             cutoff += 1
 
-        return seq[:cutoff],qual[:cutoff]
+        return seq[:cutoff], qual[:cutoff]
 
-    def __get_five_prime__(self,pattern):
+    def __get_five_prime__(self, pattern):
         if pattern is None:
             return None
         else:
             return pattern == "CCCTAA"
 
-    def __get_pattern__(self,seq):
-        cta,tag = "CCCTAA","TTAGGG"
+    def __get_pattern__(self, seq):
+        cta, tag = "CCCTAA", "TTAGGG"
         pattern = None
-        if cta in seq or tag in seq:   
+        if cta in seq or tag in seq:
             if seq.count(cta) > seq.count(tag):
                 pattern = cta
             else:
                 pattern = tag
         return pattern
 
-    def __flip_and_compliment__(self,read):
+    def __flip_and_compliment__(self, read):
         if read.is_reverse:
             compliments = self._compliments
-            seq_compliment = map(lambda base: compliments[base],read.seq)
+            seq_compliment = map(lambda base: compliments[base], read.seq)
             seq_compliment = "".join(seq_compliment)
-            return(seq_compliment[::-1],read.qual[::-1])
+            return(seq_compliment[::-1], read.qual[::-1])
         else:
-            return (read.seq,read.qual)
+            return (read.seq, read.qual)
+
 
 class MismatchingLociLogic(object):
 
-    def get_telo_mismatch(self, seq):
+    def get_telo_mismatch(self, seq, qual):
 
         c_rich_count = seq.count("CCCTAA")
         g_rich_count = seq.count("TTAGGG")
 
         if c_rich_count > g_rich_count:
-            return self.get_mismatching_loci(seq, "CCCTAA"), "CCCTAA"
+            return self.get_mismatching_loci(seq, qual, "CCCTAA"), "CCCTAA"
         elif g_rich_count > c_rich_count:
-            return self.get_mismatching_loci(seq, "TTAGGG"), "TTAGGG"
+            return self.get_mismatching_loci(seq, qual, "TTAGGG"), "TTAGGG"
         else:
-            c_mima, c_fuse = self.get_mismatching_loci(seq, "CCCTAA")
-            g_mima, g_fuse = self.get_mismatching_loci(seq, "TTAGGG")
+            c_mima, c_fuse = self.get_mismatching_loci(seq, qual, "CCCTAA")
+            g_mima, g_fuse = self.get_mismatching_loci(seq, qual, "TTAGGG")
 
             c_score = len(c_mima) + len(c_fuse)
             g_score = len(g_mima) + len(g_fuse)
@@ -165,99 +172,159 @@ class MismatchingLociLogic(object):
             else:
                 return (g_mima, g_fuse), "TTAGGG"
 
-    def get_mismatching_loci(self, seq, pattern):
-        segments = re.split("(%s)"%(pattern,), seq)
-        segments = self.filter_segments(segments)
-        segments = self.collapse_segments(segments, pattern)
-        segments = self.merge_segments(segments, pattern)
-        mima_loci, fuse_loci = self.find_mima_loci(segments, pattern)
+    def get_mismatching_loci(self, seq, qual, pattern):
+        segments = re.split("(%s)" % (pattern,), seq)
+
+        segments = self.join_complete_segments(segments, pattern)
+        
+        segment_offsets = self.get_segment_offsets(segments)
+        self.extend_offsets(segments, pattern, segment_offsets)
+
+        mima_loci, fuse_loci = self.offsets_to_loci(
+            seq, qual, pattern, segment_offsets)
 
         return mima_loci, fuse_loci
 
-    def find_mima_loci(self, segments, pattern):
+    def join_complete_segments(self, segments, pattern):
+
+        new_segements = []
+        current_segment = ''
+
+        for segment in segments:
+            if segment == '':
+                continue
+            elif segment == pattern:
+                current_segment += pattern
+            else:
+                if len(current_segment) > 0:
+                    new_segements.append(current_segment)
+                    current_segment = ''
+                new_segements.append(segment)
+
+        if len(current_segment) > 0:
+            new_segements.append(current_segment)
+        return new_segements
+
+    def offsets_to_loci(self, seq, qual, pattern, segment_offsets):
+
         mima_loci = []
         fuse_loci = []
 
+        pattern_in_prev = False
+
+        # print segment_offsets
+        # print [seq[s:e] for s, e in segment_offsets]
+
+        for start, end in segment_offsets:
+            segment = seq[start:end]
+            segment_qual = qual[start:end]
+
+            if start == end:
+                # complete merge
+                pass
+            elif pattern in segment:
+                if pattern_in_prev:
+                    # deletion event
+
+                    # +1 for exclusive upperrange
+                    fuse_loci.append((start - 1, start + 2))
+                pattern_in_prev = True
+
+            elif pattern not in segment:
+                pattern_in_prev = False
+                if end < start:
+                    # These are fused loci
+                    fuse_loci.append((end, start))
+
+                elif start < end:
+                    segment_mima = self.compare_to_telo(
+                        segment, segment_qual, pattern)
+
+                    segment_mima = [s + start for s in segment_mima]
+                    if len(segment_mima) == 0:
+                        fuse_loci.append((start, start + 1))
+                        fuse_loci.append((end - 1, end))
+                    mima_loci.extend(segment_mima)
+
+        return mima_loci, fuse_loci
+
+    def compare_to_telo(self, seq, qual, pattern):
+        comparisons = []
+        best_score = float("inf")
+
+        for i in xrange(len(pattern)):
+            comparison_seq = self.telo_sequence_generator(pattern, i)
+            mima_loci = []
+            qual_bytes = []
+            score = 0
+            for s, (l, c) in izip(seq, comparison_seq):
+                if s != c:
+                    mima_loci.append(l)
+                    qual_bytes.append(ord(qual[l]))
+
+                    score += 1
+                    if score > best_score:
+                        break
+
+            if score <= best_score:
+                best_score = score
+
+                if len(mima_loci) == 0:
+                    avg_phred = 0
+                else:
+                    avg_phred = np.mean(qual_bytes)
+                comparisons.append((score,
+                                     list(mima_loci),
+                                     avg_phred,))
+
+        return self.get_best_offset(best_score, comparisons)
+
+    def get_best_offset(self, best_score, comparisons):
+        best_comparisons = []
+        for score, loci, avg_phred in comparisons:
+            if score == best_score:
+                best_comparisons.append((avg_phred, loci))
+        best_comparisons.sort(key=lambda x: x[0])
+        return best_comparisons[0][1]
+
+    def extend_offsets(self, segments, pattern, segment_offsets):
+        for seg_id, segment in enumerate(segments):
+            if pattern in segment:
+
+                cur_seg_offsets = segment_offsets[seg_id]
+
+                if seg_id > 0:
+                    # extend_backwards
+                    prev_seg_offsets = segment_offsets[seg_id - 1]
+
+                    new_offset = self.compare_to_pattern(
+                        segments[seg_id - 1],
+                        pattern,
+                        reverse=True)
+
+                    prev_seg_offsets[1] = prev_seg_offsets[1] - new_offset
+                    cur_seg_offsets[0] = cur_seg_offsets[0] - new_offset
+
+
+                if seg_id < (len(segments) - 1):
+                    # extend_forwards
+                    next_seg_offsets = segment_offsets[seg_id + 1]
+                    new_offset = self.compare_to_pattern(
+                        segments[seg_id + 1],
+                        pattern)
+
+                    next_seg_offsets[0] = next_seg_offsets[0] + new_offset
+                    cur_seg_offsets[1] = cur_seg_offsets[1] + new_offset
+
+    def get_segment_offsets(self, segments):
+        segment_offsets = []
         offset = 0
 
-        for i,seg in enumerate(segments):
-            neighbours = self.get_neighbour_segments(segments,i)
-            
-            score, segment_loci = \
-                self.get_best_offset_score(seg, pattern, neighbours)
-            
-            mima_loci.extend(np.array(segment_loci)+offset)
+        for segment in segments:
+            segment_offsets.append([offset, offset + len(segment), ])
+            offset += len(segment)
 
-            if pattern in neighbours[0] or pattern in seg:
-                if offset-1 not in mima_loci and \
-                    offset+1 not in mima_loci and \
-                     offset not in mima_loci:
-
-                    if neighbours[0] != "":
-                        fuse_loci.append( (offset-1,offset+2,))
-            offset += len(seg)
-
-        return mima_loci,fuse_loci
-
-    def get_neighbour_segments(self, segments, i):
-        prev_segment = ""
-        next_segment = ""
-
-        if i > 0:
-            prev_segment = segments[i-1]
-        if i < (len(segments)-1):
-            next_segment = segments[i+1]
-
-        return prev_segment, next_segment
-
-    def get_best_offset_score(self, seq, 
-                                    pattern, 
-                                    neighbours, 
-                                    override = False):
-
-        best_score = float("Inf")
-        best_mima = []
-
-        if pattern in seq and not override:
-            best_score, best_mima = 0,[]
-        elif len(seq) == 1:
-            best_score, best_mima =  1,[0]
-        elif len(seq) < len(pattern)*.66:
-            for position,neighbour in enumerate(neighbours):
-                if len(neighbour) > 0:
-                    if position == 0:
-                        temp_seq = neighbour+seq
-                    else:
-                        temp_seq = seq+neighbour
-                    score, mima = self.get_best_offset_score(temp_seq, 
-                                                             pattern,
-                                                             neighbours,
-                                                             override=True)
-                    if score < best_score:
-                        best_score = score
-                        if position == 0:
-                            best_mima = \
-                                (np.array(mima) - len(neighbour)).tolist()
-                        else:
-                            best_mima = mima
-
-        else:
-            for i in xrange(len(pattern)):
-                comparison_seq = self.telo_sequence_generator(pattern, i)
-                mima_loci = []
-                score = 0
-                for s, (l, c) in izip(seq, comparison_seq):
-                    if s != c:
-                        mima_loci.append(l)
-                        score += 1
-                        if score > best_score:
-                            break
-
-                if score < best_score:
-                    best_score = score
-                    best_mima = mima_loci
-
-        return best_score, best_mima
+        return segment_offsets
             
     def telo_sequence_generator(self, pattern, offset):
 
@@ -267,69 +334,26 @@ class MismatchingLociLogic(object):
             yield i, offset_pattern[i % len(pattern)]
             i += 1
 
-    def filter_segments(self, segments):
-        return [seg for seg in segments if seg != '']
-
-    def merge_segments(self, segments, pattern):
-        merge_segments = list(segments)
-
-        for i,seg in enumerate(segments):
-            if pattern not in seg:
-                top_trim = 0
-                bottom_trim = len(seg)
-                
-                #See if valid sequence continues into the corrupted segment
-                if i > 0:
-                    #Check preccedding segment
-                    top_trim = self.compare_to_pattern(seg, pattern)
-                if i < len(segments)-1:
-                    #Check succeeding segment
-                    bottom_trim = self.compare_to_pattern(seg,
-                                                          pattern,
-                                                          reverse = True)
-
-                #ensure that loci are not merged into both
-                # i-1 and i+1 simealteanously
-                if bottom_trim < top_trim:
-                    bottom_trim = top_trim
-
-                #do merge operation
-                if top_trim > 0:
-                    merge_segments[i-1] += seg[:top_trim]
-                if bottom_trim < len(seg):
-                    merge_segments[i+1] = seg[bottom_trim:] +\
-                                             merge_segments[i+1]
-            
-                #correct current segment
-                merge_segments[i] = seg[top_trim:bottom_trim]
-
-        return self.filter_segments(merge_segments)
-
-    def compare_to_pattern(self, seq, pattern, reverse = False):
+    def compare_to_pattern(self, seq, pattern, reverse=False):
         i = 0
         generator = self.get_sequence_generator(seq, pattern, reverse)
 
-        for c,s in generator:
+        for c, s in generator:
             if c == s:
                 i += 1
             else:
                 break
 
-        if reverse:
-            return_index =  len(seq) - i
-        else:
-            return_index = i
+        return i
 
-        return return_index
-
-    def get_sequence_generator(self, seq, pattern, reverse): 
+    def get_sequence_generator(self, seq, pattern, reverse):
         def forward_gen(seq, pattern):
-            for c,s in zip(seq,pattern):
+            for c, s in zip(seq, pattern):
                 yield c, s
             return
 
         def reverse_gen(seq, pattern):
-            for c,s in izip(seq[::-1], pattern[::-1]):
+            for c, s in izip(seq[::-1], pattern[::-1]):
                 yield c, s
             return
 
@@ -340,36 +364,19 @@ class MismatchingLociLogic(object):
 
         return generator
 
-    def collapse_segments(self, segments, pattern):
-        collapsed_segments = []
-        current_segment = ''
-        for seg in segments:
-            if seg == pattern:
-                current_segment += seg
-            else:
-                if current_segment != '':
-                    collapsed_segments.append(current_segment)
-                collapsed_segments.append(seg)
-                current_segment = ''
-
-        if current_segment != '':
-            collapsed_segments.append(current_segment)
-
-        return collapsed_segments
-
     def print_mima(self, seq, qual, pat):
         print "-"
         loci_status, mima_loci, fuse_loci =\
-            self.get_loci_status(seq, pat)
+            self.get_loci_status(seq, qual, pat)
 
-        print "Mima:",mima_loci
-        print "Fuse:",fuse_loci
+        print "Mima:", mima_loci
+        print "Fuse:", fuse_loci
         print seq
         print loci_status
         print qual
 
-    def get_loci_status(self, seq, pat):
-        mima_loci,fuse_loci = self.get_mismatching_loci(seq,pat)
+    def get_loci_status(self, seq, qual, pat):
+        mima_loci, fuse_loci = self.get_mismatching_loci(seq, qual, pat)
         loci_status = []
 
         for i in xrange(len(seq)):
@@ -378,10 +385,11 @@ class MismatchingLociLogic(object):
             else:
                 loci_status.append("_")
 
-        for start,end in fuse_loci:
+        for start, end in fuse_loci:
             loci_status[start:end] = ["F"] * (end - start)
 
         return "".join(loci_status), mima_loci, fuse_loci
+
 
 class VitalStatsFinder(object):
 
