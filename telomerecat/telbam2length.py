@@ -71,7 +71,7 @@ class SimpleReadFactory(object):
             n_loci,
             avg_qual)
 
-        #self.mima_logic.print_mima(seq, qual, pattern)
+        self.mima_logic.print_mima(seq, qual, pattern)
 
         return simple_read
 
@@ -211,8 +211,8 @@ class MismatchingLociLogic(object):
         fuse_loci = []
         seq_len = len(seq)
 
-        # print segment_offsets
-        # print [seq[s:e] for s, e in segment_offsets]
+        print segment_offsets
+        print [seq[s:e] for s, e in segment_offsets]
 
         for start, end in segment_offsets:
             segment = seq[start:end]
@@ -230,11 +230,14 @@ class MismatchingLociLogic(object):
                     fuse_loci.append((end, start))
 
                 elif start < end:
-                    segment_mima = self.compare_to_telo(
-                        segment, segment_qual, pattern)
+                    if (end-start) > 1:
+                        segment_mima = self.compare_to_telo(
+                            segment, segment_qual, pattern)
 
-                    segment_mima = [s + start for s in segment_mima]
-                    mima_loci.extend(segment_mima)
+                        segment_mima = [s + start for s in segment_mima]
+                        mima_loci.extend(segment_mima)
+                    else:
+                        mima_loci.append(start)
 
                 elif start == end:
                     #complete merge
@@ -247,13 +250,16 @@ class MismatchingLociLogic(object):
         remove_candidates = []
         offset = 0
         for loci in mima_loci:
+            add_to_offset = 0
             for fuse_id,(start,end) in enumerate(fuse_loci[offset:]):
-                if start <= loci and end >= loci:
-                    remove_candidates.append(fuse_id)
+                if start <= loci and loci <= end:
+                    remove_candidates.append(offset+fuse_id)
                 elif loci > end:
-                    offset = fuse_id
+                    add_to_offset += 1
+                elif loci < start:
+                    offset += add_to_offset
                     break
-        
+
         filtered_fuse = []
         for fuse_id, fuse in enumerate(fuse_loci):
             if fuse_id not in remove_candidates:
