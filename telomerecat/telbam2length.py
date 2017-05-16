@@ -58,7 +58,7 @@ class SimpleReadFactory(object):
         (mima_loci, frameshift_loci), pattern = \
                 self.mima_logic.get_telo_mismatch(seq, qual)
 
-        avg_qual, n_loci = self.__get_phred_score__(qual,
+        avg_qual, n_loci = self.__get_phred_score__(seq,qual,
                                                     mima_loci,
                                                     frameshift_loci)
 
@@ -75,7 +75,7 @@ class SimpleReadFactory(object):
 
         return simple_read
 
-    def __get_phred_score__(self, qual, mima_loci, frameshift_loci):
+    def __get_phred_score__(self, seq, qual, mima_loci, frameshift_loci):
         if len(mima_loci) + len(frameshift_loci) == 0:
             return 0, 0
 
@@ -209,8 +209,7 @@ class MismatchingLociLogic(object):
 
         mima_loci = []
         fuse_loci = []
-
-        pattern_in_prev = False
+        seq_len = len(seq)
 
         # print segment_offsets
         # print [seq[s:e] for s, e in segment_offsets]
@@ -219,20 +218,14 @@ class MismatchingLociLogic(object):
             segment = seq[start:end]
             segment_qual = qual[start:end]
 
-            if start == end:
-                # complete merge
-                pass
-            elif pattern in segment:
-                if pattern_in_prev:
-                    # deletion event
+            if start > 0 and start < end:
+                # deletion event
+                # +1 for exclusive upperrange
+                end_of_range = min((start+2,seq_len,))
+                fuse_loci.append((start - 1, end_of_range))
 
-                    # +1 for exclusive upperrange
-                    fuse_loci.append((start - 1, start + 2))
-                pattern_in_prev = True
-
-            elif pattern not in segment:
-                pattern_in_prev = False
-                if end < start:
+            if pattern not in segment:
+                if start > end:
                     # These are fused loci
                     fuse_loci.append((end, start))
 
@@ -241,12 +234,32 @@ class MismatchingLociLogic(object):
                         segment, segment_qual, pattern)
 
                     segment_mima = [s + start for s in segment_mima]
-                    if len(segment_mima) == 0:
-                        fuse_loci.append((start, start + 1))
-                        fuse_loci.append((end - 1, end))
                     mima_loci.extend(segment_mima)
 
+                elif start == end:
+                    #complete merge
+                    pass
+
+        fuse_loci = self.filter_fuse_loci(mima_loci, fuse_loci)
         return mima_loci, fuse_loci
+
+    def filter_fuse_loci(self, mima_loci, fuse_loci):
+        remove_candidates = []
+        offset = 0
+        for loci in mima_loci:
+            for fuse_id,(start,end) in enumerate(fuse_loci[offset:]):
+                if start <= loci and end >= loci:
+                    remove_candidates.append(fuse_id)
+                elif loci > end:
+                    offset = fuse_id
+                    break
+        
+        filtered_fuse = []
+        for fuse_id, fuse in enumerate(fuse_loci):
+            if fuse_id not in remove_candidates:
+                filtered_fuse.append(fuse)
+
+        return filtered_fuse
 
     def compare_to_telo(self, seq, qual, pattern):
         comparisons = []
@@ -595,7 +608,7 @@ class ReadStatsFactory(object):
     def __remove_noise__(self, error_profile):
         row_max, col_max = error_profile.shape
         error_profile[int(row_max * .11):, int(col_max * .7):] = 0
-        error_profile[int(row_max * .35):, 0] = 0
+        error_profile[int(row_max * .40):, 0] = 0
         error_profile[int(row_max * .55):, :] = 0
 
         return error_profile
