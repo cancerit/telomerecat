@@ -5,6 +5,8 @@
 - Tidied up the code surrounding mismatching loci following code review.
   Process should be easier to follow now
 - Minor bug fixes and restructing in telbam2length
+- Changed the requirements such that a fixed version of pysam is required
+  this version is proven stable and more recent versions have caused crashes
 
 2017/1/24 - Telomerecat v3.1.1 - jhrf
 
