@@ -35,7 +35,7 @@ def rule(reads, constants, master):
 
     for read in iter(reads):
         for pattern in tel_pats:
-            if pattern in read.seq:
+            if read.seq is not None and pattern in read.seq:
                 telomere_status = True
                 break
 

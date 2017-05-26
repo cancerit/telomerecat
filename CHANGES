@@ -1,3 +1,11 @@
+2017/5/26 - Telomerecat v3.1.2 - jhrf
+
+- Added a check in bam2telbam rule that ensures the read.seq is loaded into
+  the read and does not return None. This was causing a hang in PCAWG samples 
+- Tidied up the code surrounding mismatching loci following code review.
+  Process should be easier to follow now
+- Minor bug fixes and restructing in telbam2length
+
 2017/1/24 - Telomerecat v3.1.1 - jhrf
 
 - Removed debug print message from telbam2length

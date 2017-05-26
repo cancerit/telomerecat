@@ -71,7 +71,7 @@ class SimpleReadFactory(object):
             n_loci,
             avg_qual)
 
-        self.mima_logic.print_mima(seq, qual, pattern)
+        # self.mima_logic.print_mima(seq, qual, pattern)
 
         return simple_read
 
@@ -211,8 +211,8 @@ class MismatchingLociLogic(object):
         fuse_loci = []
         seq_len = len(seq)
 
-        print segment_offsets
-        print [seq[s:e] for s, e in segment_offsets]
+        # print segment_offsets
+        # print [seq[s:e] for s, e in segment_offsets]
 
         for start, end in segment_offsets:
             segment = seq[start:end]
@@ -221,7 +221,7 @@ class MismatchingLociLogic(object):
             if start > 0 and start < end:
                 # deletion event
                 # +1 for exclusive upperrange
-                end_of_range = min((start+2,seq_len,))
+                end_of_range = min((start + 1,seq_len,))
                 fuse_loci.append((start - 1, end_of_range))
 
             if pattern not in segment:
@@ -252,8 +252,8 @@ class MismatchingLociLogic(object):
         for loci in mima_loci:
             add_to_offset = 0
             for fuse_id,(start,end) in enumerate(fuse_loci[offset:]):
-                if start <= loci and loci <= end:
-                    remove_candidates.append(offset+fuse_id)
+                if start <= loci and loci < end:
+                    remove_candidates.append(offset + fuse_id)
                 elif loci > end:
                     add_to_offset += 1
                 elif loci < start:
@@ -264,6 +264,19 @@ class MismatchingLociLogic(object):
         for fuse_id, fuse in enumerate(fuse_loci):
             if fuse_id not in remove_candidates:
                 filtered_fuse.append(fuse)
+
+        all_fuse_loci = []
+        for start, end in fuse_loci:
+            all_fuse_loci.extend(range(start, end))
+
+        merged_fuse = []
+        current_fuse = []
+        for i in set(all_fuse_loci):
+            current_fuse.append(i)
+            if len(current_fuse) > 1 and \
+                (current_fuse[-1] - current_fuse[-2]) > 1:
+                merged_fuse.append((current_fuse[0], current_fuse[-1] + 1,))
+                current_fuse = []
 
         return filtered_fuse
 
@@ -940,8 +953,6 @@ class Telbam2Length(TelomerecatInterface):
                                                        vital_stats,
                                                        self.total_procs,
                                                        trim)
-
-            print read_type_counts
 
             self.__write_to_csv__(read_type_counts,
                                     vital_stats,
