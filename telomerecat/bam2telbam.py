@@ -1,30 +1,18 @@
-#!/usr/bin/env python
-#Once upon a time...
 
-#Create a bam file with all the putatative telomere reads
+"""
+Create TELBAMS given a set of BAM files.
 
-import sys,os
-import argparse
+TELBAMS are comprised of all the reads in a BAM file that include the
+canonic TTAGGG telomere sequence
+
+Author: jhrf
+"""
+
+import sys
 import textwrap
-import pysam
-import time
 import gc
-import pdb
 
 import parabam
-
-import Queue as Queue2
-
-from multiprocessing import Queue,Process
-from itertools import izip
-
-######################################################################
-##
-##      Create telbams for list of given BAM files.
-##
-##      Author: jhrf
-##
-######################################################################
 
 #Here we define what constitutes a telomereic read.
 #If both reads in a pair match the critea we store

@@ -1,29 +1,24 @@
-import sys
+
+"""
+Create length estimates given a set of TELBAMS.
+
+Author: jhrf
+"""
+
 import textwrap
 import time
 import os
 import re
 import parabam
-import pdb
 
 import numpy as np
 import pandas as pd
 
-from shutil import copy
 from itertools import izip
-from collections import namedtuple, Counter
-from pprint import pprint
+from collections import namedtuple
 
 from telomerecat import Csv2Length
 from telomerecat.core import TelomerecatInterface
-
-######################################################################
-##
-##      Create a length estimate given a set of TELBAMS
-##
-##      Author: jhrf
-##
-######################################################################
 
 
 class SimpleReadFactory(object):
@@ -460,6 +455,7 @@ class VitalStatsFinder(object):
                 "qual_sd": qual_sd}
 
     def __get_mean_and_sd__(self, x_sum, x_power_2, x_N):
+
         x_mean = x_sum / x_N
         x_sd = np.sqrt((x_N * x_power_2) - x_sum**2) / x_N
 
@@ -528,6 +524,7 @@ class VitalStatsFinder(object):
                                        struc_blueprint=structures)
 
         return out_paths["global"]["stats"]
+
 
 class ReadStatsFactory(object):
 
@@ -756,16 +753,16 @@ class ReadStatsFactory(object):
         return pd.read_csv(read_array_path, header=None).values
 
     def read_array_to_counts(self, read_array, error_profile, sample_variance):
-        complete_reads,boundary_reads = \
-                        self.__get_complete_status__(read_array,error_profile)
+        complete_reads, boundary_reads = \
+            self.__get_complete_status__(read_array, error_profile)
 
-        f2_count,f4_count = self.__get_boundary_counts__(boundary_reads)
+        f2_count, f4_count = self.__get_boundary_counts__(boundary_reads)
         f1_count = self.__get_f1_count__(complete_reads)
 
-        return_dat = { "F2":int(f2_count),
-                       "F1":int(f1_count),
-                       "F4":f4_count,
-                       "sample_variance":sample_variance}
+        return_dat = {"F2": int(f2_count),
+                      "F1": int(f1_count),
+                      "F4": f4_count,
+                      "sample_variance": sample_variance}
 
         return return_dat
 
@@ -788,30 +785,30 @@ class ReadStatsFactory(object):
         complete_indicies = []
 
         for i in xrange(int(read_array.shape[0])):
-            read_info = map(int,read_array[i,[0,-2]])
-            pair_info = map(int,read_array[i,[2,-1]])
+            read_info = map(int, read_array[i, [0, -2]])
+            pair_info = map(int, read_array[i, [2, -1]])
 
-            read = error_profile[read_info[0],read_info[1]] 
-            pair = error_profile[pair_info[0],pair_info[1]]
+            read = error_profile[read_info[0], read_info[1]]
+            pair = error_profile[pair_info[0], pair_info[1]]
 
             if read and pair:
                 complete_indicies.append(i)
             elif (not read) and pair:
                 boundary_indicies.append(i)
 
-        return read_array[complete_indicies,:],\
-                read_array[boundary_indicies,:]
+        return read_array[complete_indicies, :],\
+                read_array[boundary_indicies, :]
 
-    def run_read_stat_rule(self,path,
-                                vital_stats,
-                                keep_in_temp=True):
+    def run_read_stat_rule(self, path,
+                                 vital_stats,
+                                 keep_in_temp=True):
 
         simple_read_factory = SimpleReadFactory(vital_stats,
                                                 trim_reads=self._trim)
         phred_offset = vital_stats["phred_offset"]
 
-        maxtrix_max = (vital_stats["max_qual"] - phred_offset)+1
-        matrix_shape = (vital_stats["read_len"]+1,maxtrix_max)
+        maxtrix_max = (vital_stats["max_qual"] - phred_offset) + 1
+        matrix_shape = (vital_stats["read_len"] + 1, maxtrix_max)
 
         def get_return_stats(reads):
 
@@ -825,30 +822,29 @@ class ReadStatsFactory(object):
             return return_stats
 
         def rule(reads, constants, master):
-            simple_reads = [simple_read_factory.get_simple_read(read) \
-                                                         for read in reads]
-            return_dat = np.zeros((2,6))
-            return_dat[0,:] = get_return_stats(simple_reads)
-            return_dat[1,:] = get_return_stats(simple_reads[::-1])
+            simple_reads = [simple_read_factory.get_simple_read(read)
+                                for read in reads]
+            return_dat = np.zeros((2, 6))
+            return_dat[0, :] = get_return_stats(simple_reads)
+            return_dat[1, :] = get_return_stats(simple_reads[::-1])
 
             random_counts = np.zeros(matrix_shape)
             mima_counts = np.zeros(matrix_shape)
 
             for read in simple_reads:
-                mima_counts[read.n_loci,int(read.avg_qual)] += 1
+                mima_counts[read.n_loci, int(read.avg_qual)] += 1
 
-                #sample_size = int(np.random.uniform(1,80))
                 sample_size = len(read.mima_loci)
                 if sample_size > 0:
-                    rand_quals  = np.random.choice(list(read.qual),sample_size)
-                    qual_bytes  = [ord(q) - phred_offset for q in rand_quals]
+                    rand_quals = np.random.choice(list(read.qual), sample_size)
+                    qual_bytes = [ord(q) - phred_offset for q in rand_quals]
                     rand_avg = np.mean(qual_bytes)
 
-                    random_counts[int(sample_size),int(rand_avg)] += 1
+                    random_counts[int(sample_size), int(rand_avg)] += 1
 
-            results = {"read_array":np.array(return_dat),
-                       "random_counts":random_counts,
-                       "mima_counts":mima_counts}
+            results = {"read_array": np.array(return_dat),
+                       "random_counts": random_counts,
+                       "mima_counts": mima_counts}
 
             return results
 
@@ -861,18 +857,19 @@ class ReadStatsFactory(object):
 
         stat_interface = parabam.Stat(temp_dir=self.temp_dir,
                                       pair_process=True,
-                                      total_procs = self._total_procs,
-                                      task_size = self._task_size,
-                                      keep_in_temp = keep_in_temp,
+                                      total_procs=self._total_procs,
+                                      task_size=self._task_size,
+                                      keep_in_temp=keep_in_temp,
                                       verbose=0)
 
         out_paths = stat_interface.run(
-            input_paths = [path],
-            constants = {},
-            rule = rule,
-            struc_blueprint = structures)
+            input_paths=[path],
+            constants={},
+            rule=rule,
+            struc_blueprint=structures)
 
         return out_paths[path]
+
 
 class Telbam2Length(TelomerecatInterface):
 
@@ -885,27 +882,29 @@ class Telbam2Length(TelomerecatInterface):
                  announce=True,
                  cmd_run=False):
 
-        super(Telbam2Length,self).__init__(instance_name=\
-                                            "telomerecat telbam2length", 
-                                            temp_dir=temp_dir,
-                                            task_size=task_size,
-                                            total_procs=total_procs,
-                                            reader_n=reader_n,
-                                            verbose=verbose,
-                                            announce=announce,
-                                            cmd_run=cmd_run)
+        super(Telbam2Length, self).__init__(
+            instance_name="telomerecat telbam2length",
+            temp_dir=temp_dir,
+            task_size=task_size,
+            total_procs=total_procs,
+            reader_n=reader_n,
+            verbose=verbose,
+            announce=announce,
+            cmd_run=cmd_run)
 
     def run_cmd(self):
         self.run(input_paths=self.cmd_args.input,
                  trim=self.cmd_args.trim,
-                 inserts_path=self.cmd_args.insert,
-                 correct_f2a=not self.cmd_args.disable_correction,
-                 output_path=self.cmd_args.output)
+                 output_path=self.cmd_args.output,
+                 simulator_n=self.cmd_args.simulator_runs,
+                 correct_f2a=self.cmd_args.enable_correction,
+                 inserts_path=self.cmd_args.insert)
 
     def run(self, input_paths,
                   trim=0,
                   output_path=None,
-                  correct_f2a=True,
+                  correct_f2a=False,
+                  simulator_n=10,
                   inserts_path=None):
         
         """The main function for invoking the part of the
@@ -921,8 +920,8 @@ class Telbam2Length(TelomerecatInterface):
 
         self.__introduce__()
 
-        names = map(lambda b: os.path.basename(b),input_paths)
-        names = map(lambda nm: nm.replace("_telbam",""),names)
+        names = map(lambda b: os.path.basename(b), input_paths)
+        names = map(lambda nm: nm.replace("_telbam", ""), names)
 
         output_csv_path = self.__get_output_path__(output_path)
         temp_csv_path = self.__get_temp_path__()
@@ -930,18 +929,18 @@ class Telbam2Length(TelomerecatInterface):
         insert_length_generator = self.__get_insert_generator__(inserts_path)
         
         self.__output__(" Collecting meta-data for all samples | %s\n" \
-                            % (self.__get_date_time__(),),1)
+                            % (self.__get_date_time__(),), 1)
 
         vital_stats_finder = VitalStatsFinder(self.temp_dir,
                                               self.total_procs,
                                               self.task_size,
                                               trim)
 
-        for sample_path,sample_name, in izip(input_paths,names):
-            sample_intro = "\t- %s | %s\n" % (sample_name, 
+        for sample_path, sample_name, in izip(input_paths, names):
+            sample_intro = "\t- %s | %s\n" % (sample_name,
                                               self.__get_date_time__())
 
-            self.__output__(sample_intro,2)
+            self.__output__(sample_intro, 2)
 
             vital_stats = vital_stats_finder.get_vital_stats(sample_path)
 
@@ -959,16 +958,17 @@ class Telbam2Length(TelomerecatInterface):
                                     temp_csv_path,
                                     sample_name)
         
-        self.__output__("\n",1)
+        self.__output__("\n", 1)
         length_interface = Csv2Length(temp_dir=self.temp_dir,
                                        total_procs=self.total_procs,
                                        verbose=self.verbose,
                                        announce=False,
                                        cmd_run=False)
 
-        length_interface.run(input_paths=[temp_csv_path], 
+        length_interface.run(input_paths=[temp_csv_path],
                              output_paths=[output_csv_path],
-                             correct_f2a=correct_f2a)
+                             correct_f2a=correct_f2a,
+                             simulator_n=simulator_n)
 
         self.__print_output_information__(output_csv_path)
         self.__goodbye__()
@@ -977,35 +977,39 @@ class Telbam2Length(TelomerecatInterface):
 
     def __print_output_information__(self, output_csv_path):
         self.__output__((" Length estimation results "
-                         "written to the following file:\n"),1)
+                         "written to the following file:\n"), 1)
         self.__output__("\t./%s\n\n" % (os.path.basename(output_csv_path,)))
 
-    def __get_insert_generator__(self,inserts_path):
+    def __get_insert_generator__(self, inserts_path):
         if inserts_path:
-            with open(inserts_path,"r") as inserts_file:
+            with open(inserts_path, "r") as inserts_file:
                 for line in inserts_file:
-                    yield map(float,line.split(","))
+                    yield map(float, line.split(","))
 
-    def __check_vital_stats_insert_size__(self,inserts_path,
-                                        insert_length_generator,vital_stats):
+    def __check_vital_stats_insert_size__(self,
+                                          inserts_path,
+                                          insert_length_generator,
+                                          vital_stats):
         if inserts_path:
-            insert_mean,insert_sd = insert_length_generator.next()
+            insert_mean, insert_sd = insert_length_generator.next()
             vital_stats["insert_mean"] = insert_mean
             vital_stats["insert_sd"] = insert_sd
-            self.__output__("\t\t+ Using user defined insert size: %d,%d\n" \
-                                                    % (insert_mean,insert_sd),2)
+            self.__output__(
+                "\t\t+ Using user defined insert size: %d,%d\n"
+                % (insert_mean, insert_sd), 2)
         elif vital_stats["insert_mean"] == -1:
-            default_mean,default_sd = 350,25
+            default_mean, default_sd = 350, 25
             vital_stats["insert_mean"] = 350
             vital_stats["insert_sd"] = 25
-            self.__output__("\t\t+ Failed to estimate insert size. Using default: %d,%d\n"\
-                                                % (default_mean,default_sd),2)
+            self.__output__(
+                "\t\t+ Failed to estimate insert size. Using default: %d,%d\n"
+                % (default_mean, default_sd), 2)
 
-    def __get_read_types__(self,sample_path,
-                                vital_stats,
-                                total_procs,
-                                trim,
-                                read_stats_factory=None):
+    def __get_read_types__(self, sample_path,
+                                 vital_stats,
+                                 total_procs,
+                                 trim,
+                                 read_stats_factory=None):
 
         if read_stats_factory is None:
             read_stats_factory = ReadStatsFactory(temp_dir=self.temp_dir,
@@ -1015,10 +1019,10 @@ class Telbam2Length(TelomerecatInterface):
             
         read_type_counts = read_stats_factory.get_read_counts(sample_path,
                                                               vital_stats)
-        return read_type_counts 
+        return read_type_counts
 
     def __get_temp_path__(self):
-        temp_path = os.path.join(self.temp_dir,"telomerecat_temp_%d.csv" \
+        temp_path = os.path.join(self.temp_dir, "telomerecat_temp_%d.csv" \
                                                             % (time.time()))
         self.__create_output_file__(temp_path)
         return temp_path
@@ -1033,8 +1037,8 @@ class Telbam2Length(TelomerecatInterface):
 
         return tmct_output_path
 
-    def __create_output_file__(self,output_csv_path):
-        with open(output_csv_path,"w") as total:
+    def __create_output_file__(self, output_csv_path):
+        with open(output_csv_path, "w") as total:
             header = ("Sample,F1,F2,F4,Psi,Insert_mean,Insert_sd,"
                       "Read_length,Initial_read_length\n")
             total.write(header)
@@ -1045,8 +1049,8 @@ class Telbam2Length(TelomerecatInterface):
                          vital_stats,
                          output_csv_path,
                          name):
-        with open(output_csv_path,"a") as counts:
-            counts.write("%s,%d,%d,%d,%.3f,%.3f,%.3f,%d,%d\n" %\
+        with open(output_csv_path, "a") as counts:
+            counts.write("%s,%d,%d,%d,%.3f,%.3f,%.3f,%d,%d\n" % \
                                         (name,
                                          read_type_counts["F1"],
                                          read_type_counts["F2"],
@@ -1079,17 +1083,20 @@ class Telbam2Length(TelomerecatInterface):
                self.header_line,
                self.header_line,))
 
-        parser.add_argument('input', metavar='TELBAM(S)', nargs='+',
+        parser.add_argument(
+            'input', metavar='TELBAM(S)', nargs='+',
             help="The TELBAM(s) that we wish to analyse")
-        parser.add_argument('--output',
-            metavar='CSV',type=str, nargs='?', default=None,
+        parser.add_argument(
+            '--output', metavar='CSV', type=str, nargs='?', default=None,
             help=('Specify output path for length estimation CSV.\n'
                   'Automatically generated if left blank [Default: None]'))
-        parser.add_argument('-s',type=int, nargs='?', default=10000
-            ,help="The amount of reads considered by each\n"
-                    "distributed task. [Default: 10000]")
-        parser.add_argument('-t',"--trim", type=int, nargs='?', default=0
-            ,help="Use only the amount of sequence specified by this  \n"
+        parser.add_argument(
+            '-s', type=int, nargs='?', default=10000,
+            help=("The amount of reads considered by each\n"
+                  "distributed task. [Default: 10000]"))
+        parser.add_argument(
+            '-t', "--trim", type=int, nargs='?', default=0,
+            help="Use only the amount of sequence specified by this  \n"
                   "option (i.e if the value 90 is supplied\n"
                   "then only the first 90 bases are\n"
                   "considered) [Default: Whole read]")

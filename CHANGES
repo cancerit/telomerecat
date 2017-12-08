@@ -1,3 +1,14 @@
+2017/12/8 - Telomerecat v3.2 -jhrf
+
+- Fixed a bug in the command line interface where the specificed number
+  of runs of the simulation was not passed to the simulator. The default value
+  would always be used instead.
+- It is now default to NOT use F2a correction. The user must now specify the use
+  of F2a correction with the `-e` parameter. The `-d` parameter (disable-correction)
+  has been deprecated
+- General code format corrections across all files.
+
+
 2017/5/26 - Telomerecat v3.1.2 - jhrf
 
 - Added a check in bam2telbam rule that ensures the read.seq is loaded into
