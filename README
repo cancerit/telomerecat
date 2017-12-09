@@ -7,4 +7,6 @@ Telomerecat is adaptable, accurate and fast. The algorithm accounts for sequenci
 
 A full manual for Telomerecat is available at: telomerecat.readthedocs.org
 
-Contact Henry Farmery (jhrf2@cam.ac.uk) for support regarding this tool.
+For technical support (bug fixes, unexpected behaviour) regarding this tool please raise an issue using the GitHub tracker. For scientific queries please contact the author.
+
+Author: Henry Farmery (jhrf2@cam.ac.uk) 
