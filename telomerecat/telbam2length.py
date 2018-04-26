@@ -457,7 +457,7 @@ class VitalStatsFinder(object):
     def __get_mean_and_sd__(self, x_sum, x_power_2, x_N):
 
         x_mean = x_sum / x_N
-        x_sd = np.sqrt((x_N * x_power_2) - x_sum**2) / x_N
+        x_sd = np.sqrt(float((x_N * x_power_2)) - float(x_sum**2)) / x_N
 
         return x_mean, x_sd
 
