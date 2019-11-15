@@ -12,67 +12,67 @@ import parabam
 
 
 def handle_input():
-    command_map = {
-        "bam2length": telomerecat.Bam2Length,
-        "bam2telbam": telomerecat.Bam2Telbam,
-        "telbam2length": telomerecat.Telbam2Length,
-        "csv2length": telomerecat.Csv2Length,
-    }
+  command_map = {
+    "bam2length": telomerecat.Bam2Length,
+    "bam2telbam": telomerecat.Bam2Telbam,
+    "telbam2length": telomerecat.Telbam2Length,
+    "csv2length": telomerecat.Csv2Length,
+  }
 
-    help_text = get_help_text()
+  help_text = get_help_text()
 
-    cmd_interface = parabam.core.CmdLineInterface(program_name="telomerecat")
-    cmd_interface.handle(command_map, help_text)
+  cmd_interface = parabam.core.CmdLineInterface(program_name="telomerecat")
+  cmd_interface.handle(command_map, help_text)
 
 
 def get_help_text():
-    help_text = (
-        textwrap.dedent(
-            """\
+  help_text = (
+    textwrap.dedent(
+      """\
 
-        telomerecat
-        -----------------------------------------------------------------------------
+    telomerecat
+    -----------------------------------------------------------------------------
 
-        About: 
-            Telomere Computational Analysis Tool
+    About: 
+      Telomere Computational Analysis Tool
 
-        Version:
-            %s
+    Version:
+      %s
 
-        Usage:
-            telomerecat <command> [options] input:{BAM/TELBAM}
+    Usage:
+      telomerecat <command> [options] input:{BAM/TELBAM}
 
-        Quick Start Example:
+    Quick Start Example:
 
-            telomerecat bam2length -p8 { path_to_bamfile(s) }
+      telomerecat bam2length -p8 { path_to_bamfile(s) }
 
-            The above genereates a CSV file containing an estimation of average 
-            telomere length for BAM files provided.
+      The above genereates a CSV file containing an estimation of average 
+      telomere length for BAM files provided.
 
-        More:
-            Users may wish to segregate the heavy lifting process of creating
-            a telbam (essentially a subset of telomeric reads in a BAM file) 
-            from the reletively quick process of generating the length estimation.
+    More:
+      Users may wish to segregate the heavy lifting process of creating
+      a telbam (essentially a subset of telomeric reads in a BAM file) 
+      from the reletively quick process of generating the length estimation.
 
-            Generating telbams first, (with the command `bam2telbam`) allows
-            users to run multiple analysis on the same file without having to 
-            run the entire process multiple times. Type `telomerecat bam2telbam`
-            for more information.
+      Generating telbams first, (with the command `bam2telbam`) allows
+      users to run multiple analysis on the same file without having to 
+      run the entire process multiple times. Type `telomerecat bam2telbam`
+      for more information.
 
-            If you have already generated a set of telbams and just want to 
-            run length estimation on these files type `telomerecat telbam2length`
-            for more information.
+      If you have already generated a set of telbams and just want to 
+      run length estimation on these files type `telomerecat telbam2length`
+      for more information.
 
-        Commands:
-            bam2length      Estimate telomere length within BAM files
-            bam2telbam      Create telbams from BAM files
-            telbam2length   Estimate telomere length within TELBAMs
-        """.expandtabs()
-        )
-        % (telomerecat.__version__,)
+    Commands:
+      bam2length      Estimate telomere length within BAM files
+      bam2telbam      Create telbams from BAM files
+      telbam2length   Estimate telomere length within TELBAMs
+    """.expandtabs()
     )
-    return help_text
+    % (telomerecat.__version__,)
+  )
+  return help_text
 
 
 if __name__ == "__main__":
-    handle_input()
+  handle_input()
