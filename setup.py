@@ -10,7 +10,7 @@ setup(
   name="telomerecat",
   description="Telomere Computational Analysis Tool",
   version=__version__,
-  author="Sanger CASM IT",
+  author="JHR Farmery",
   license="GPL",
   author_email="cgpit@sanger.ac.uk",
   packages=["telomerecat"],
