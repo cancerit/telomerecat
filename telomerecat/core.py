@@ -1,4 +1,3 @@
-
 """
 This module defines a class that all other commands inherit from.
 
@@ -16,15 +15,17 @@ class TelomerecatInterface(parabam.core.Interface):
 
     __metaclass__ = ABCMeta
 
-    def __init__(self,
-                 instance_name,
-                 temp_dir=None,
-                 task_size=10000,
-                 total_procs=8,
-                 reader_n=2,
-                 verbose=False,
-                 announce=True,
-                 cmd_run=False):
+    def __init__(
+        self,
+        instance_name,
+        temp_dir=None,
+        task_size=10000,
+        total_procs=8,
+        reader_n=2,
+        verbose=False,
+        announce=True,
+        cmd_run=False,
+    ):
 
         super(TelomerecatInterface, self).__init__(
             instance_name=instance_name,
@@ -34,7 +35,8 @@ class TelomerecatInterface(parabam.core.Interface):
             reader_n=reader_n,
             verbose=verbose,
             announce=announce,
-            cmd_run=cmd_run)
+            cmd_run=cmd_run,
+        )
 
     def __output__(self, outstr, level=-1):
         if self.verbose and (self.verbose >= level or level == -1):
@@ -45,29 +47,50 @@ class TelomerecatInterface(parabam.core.Interface):
         parser = super(TelomerecatInterface, self).default_parser()
 
         parser.add_argument(
-            '--output',
-            metavar='CSV', type=str, nargs='?', default=None,
-            help=('Specify output path for length estimation CSV.\n'
-                  'Path automatically generated if no path is\n'
-                  'specified [Default: None]'))
+            "--output",
+            metavar="CSV",
+            type=str,
+            nargs="?",
+            default=None,
+            help=(
+                "Specify output path for length estimation CSV.\n"
+                "Path automatically generated if no path is\n"
+                "specified [Default: None]"
+            ),
+        )
         parser.add_argument(
-            '--insert',
-            metavar='CSV', nargs='?', type=str, default=None,
-            help=('A file specifying the insert length mean and\n'
-                  'std for each input sample. If not present\n'
-                  'telomerecat will automatically estimate\n'
-                  'insert length of sample [Default: None]'))
+            "--insert",
+            metavar="CSV",
+            nargs="?",
+            type=str,
+            default=None,
+            help=(
+                "A file specifying the insert length mean and\n"
+                "std for each input sample. If not present\n"
+                "telomerecat will automatically estimate\n"
+                "insert length of sample [Default: None]"
+            ),
+        )
         parser.add_argument(
-            '-N', '--simulator_runs',
-            metavar='INT', type=int, default=10,
-            help=('The amount of times to run the length simulator.\n'
-                  'A higher number better captures the uncertainty \n'
-                  'produced by the insert length\n'
-                  'distribution [Deafult 10]'))
+            "-N",
+            "--simulator_runs",
+            metavar="INT",
+            type=int,
+            default=10,
+            help=(
+                "The amount of times to run the length simulator.\n"
+                "A higher number better captures the uncertainty \n"
+                "produced by the insert length\n"
+                "distribution [Deafult 10]"
+            ),
+        )
         parser.add_argument(
-            '-e', '--enable_correction',
-            action="store_true", default=False,
-            help='Correction will be applied to F2a values')
+            "-e",
+            "--enable_correction",
+            action="store_true",
+            default=False,
+            help="Correction will be applied to F2a values",
+        )
 
         # TODO: Implement these additional parameters:
         #
@@ -83,4 +106,3 @@ class TelomerecatInterface(parabam.core.Interface):
         #           'in F2a correction [Default 3]'))
 
         return parser
-

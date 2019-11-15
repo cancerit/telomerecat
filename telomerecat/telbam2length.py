@@ -1,4 +1,3 @@
-
 """
 Create length estimates given a set of TELBAMS.
 
@@ -22,11 +21,10 @@ from telomerecat.core import TelomerecatInterface
 
 
 class SimpleReadFactory(object):
-
     def __init__(self, vital_stats=None, trim_reads=0):
-        self._SimpleRead = namedtuple("SimpleRead", "seq qual" +
-                                      " five_prime pattern mima_loci n_loci" +
-                                      " avg_qual")
+        self._SimpleRead = namedtuple(
+            "SimpleRead", "seq qual" + " five_prime pattern mima_loci n_loci" + " avg_qual"
+        )
 
         if vital_stats:
             self._read_len = vital_stats["read_len"]
@@ -36,35 +34,22 @@ class SimpleReadFactory(object):
             self._phred_offset = 33
 
         self._trim_reads = trim_reads
-        self._compliments = {"A": "T",
-                             "T": "A",
-                             "C": "G",
-                             "G": "C",
-                             "N": "N"}
+        self._compliments = {"A": "T", "T": "A", "C": "G", "G": "C", "N": "N"}
 
         self.mima_logic = MismatchingLociLogic()
 
     def get_simple_read(self, read):
         seq, qual = self.__flip_and_compliment__(read)
         if self._trim_reads > 0:
-            seq, qual = (seq[:self._trim_reads],
-                         qual[:self._trim_reads])
+            seq, qual = (seq[: self._trim_reads], qual[: self._trim_reads])
 
-        (mima_loci, frameshift_loci), pattern = \
-                self.mima_logic.get_telo_mismatch(seq, qual)
+        (mima_loci, frameshift_loci), pattern = self.mima_logic.get_telo_mismatch(seq, qual)
 
-        avg_qual, n_loci = self.__get_phred_score__(seq,qual,
-                                                    mima_loci,
-                                                    frameshift_loci)
+        avg_qual, n_loci = self.__get_phred_score__(seq, qual, mima_loci, frameshift_loci)
 
         simple_read = self._SimpleRead(
-            seq,
-            qual,
-            self.__get_five_prime__(pattern),
-            pattern,
-            mima_loci,
-            n_loci,
-            avg_qual)
+            seq, qual, self.__get_five_prime__(pattern), pattern, mima_loci, n_loci, avg_qual
+        )
 
         # self.mima_logic.print_mima(seq, qual, pattern)
 
@@ -96,8 +81,7 @@ class SimpleReadFactory(object):
     def __get_average_qual__(self, qual, mima_loci):
         if len(mima_loci) == 0:
             return 0
-        phreds = np.array([ord(qual[i]) - self._phred_offset
-                          for i in mima_loci])
+        phreds = np.array([ord(qual[i]) - self._phred_offset for i in mima_loci])
         return np.mean(phreds)
 
     def __trim_seq__(self, seq, qual):
@@ -109,7 +93,7 @@ class SimpleReadFactory(object):
                 min_sequence += 1
             else:
                 min_sequence = 0
-            
+
             if min_sequence == 5:
                 cutoff = cutoff - 5
                 break
@@ -139,13 +123,12 @@ class SimpleReadFactory(object):
             compliments = self._compliments
             seq_compliment = map(lambda base: compliments[base], read.seq)
             seq_compliment = "".join(seq_compliment)
-            return(seq_compliment[::-1], read.qual[::-1])
+            return (seq_compliment[::-1], read.qual[::-1])
         else:
             return (read.seq, read.qual)
 
 
 class MismatchingLociLogic(object):
-
     def get_telo_mismatch(self, seq, qual):
 
         c_rich_count = seq.count("CCCTAA")
@@ -171,29 +154,28 @@ class MismatchingLociLogic(object):
         segments = re.split("(%s)" % (pattern,), seq)
 
         segments = self.join_complete_segments(segments, pattern)
-        
+
         segment_offsets = self.get_segment_offsets(segments)
         self.extend_offsets(segments, pattern, segment_offsets)
 
-        mima_loci, fuse_loci = self.offsets_to_loci(
-            seq, qual, pattern, segment_offsets)
+        mima_loci, fuse_loci = self.offsets_to_loci(seq, qual, pattern, segment_offsets)
 
         return mima_loci, fuse_loci
 
     def join_complete_segments(self, segments, pattern):
 
         new_segements = []
-        current_segment = ''
+        current_segment = ""
 
         for segment in segments:
-            if segment == '':
+            if segment == "":
                 continue
             elif segment == pattern:
                 current_segment += pattern
             else:
                 if len(current_segment) > 0:
                     new_segements.append(current_segment)
-                    current_segment = ''
+                    current_segment = ""
                 new_segements.append(segment)
 
         if len(current_segment) > 0:
@@ -216,7 +198,7 @@ class MismatchingLociLogic(object):
             if start > 0 and start < end:
                 # deletion event
                 # +1 for exclusive upperrange
-                end_of_range = min((start + 1,seq_len,))
+                end_of_range = min((start + 1, seq_len,))
                 fuse_loci.append((start - 1, end_of_range))
 
             if pattern not in segment:
@@ -225,9 +207,8 @@ class MismatchingLociLogic(object):
                     fuse_loci.append((end, start))
 
                 elif start < end:
-                    if (end-start) > 1:
-                        segment_mima = self.compare_to_telo(
-                            segment, segment_qual, pattern)
+                    if (end - start) > 1:
+                        segment_mima = self.compare_to_telo(segment, segment_qual, pattern)
 
                         segment_mima = [s + start for s in segment_mima]
                         mima_loci.extend(segment_mima)
@@ -235,7 +216,7 @@ class MismatchingLociLogic(object):
                         mima_loci.append(start)
 
                 elif start == end:
-                    #complete merge
+                    # complete merge
                     pass
 
         fuse_loci = self.filter_fuse_loci(mima_loci, fuse_loci)
@@ -246,7 +227,7 @@ class MismatchingLociLogic(object):
         offset = 0
         for loci in mima_loci:
             add_to_offset = 0
-            for fuse_id,(start,end) in enumerate(fuse_loci[offset:]):
+            for fuse_id, (start, end) in enumerate(fuse_loci[offset:]):
                 if start <= loci and loci < end:
                     remove_candidates.append(offset + fuse_id)
                 elif loci > end:
@@ -268,8 +249,7 @@ class MismatchingLociLogic(object):
         current_fuse = []
         for i in set(all_fuse_loci):
             current_fuse.append(i)
-            if len(current_fuse) > 1 and \
-                (current_fuse[-1] - current_fuse[-2]) > 1:
+            if len(current_fuse) > 1 and (current_fuse[-1] - current_fuse[-2]) > 1:
                 merged_fuse.append((current_fuse[0], current_fuse[-1] + 1,))
                 current_fuse = []
 
@@ -300,9 +280,7 @@ class MismatchingLociLogic(object):
                     avg_phred = 0
                 else:
                     avg_phred = np.mean(qual_bytes)
-                comparisons.append((score,
-                                     list(mima_loci),
-                                     avg_phred,))
+                comparisons.append((score, list(mima_loci), avg_phred,))
 
         return self.get_best_offset(best_score, comparisons)
 
@@ -325,20 +303,16 @@ class MismatchingLociLogic(object):
                     prev_seg_offsets = segment_offsets[seg_id - 1]
 
                     new_offset = self.compare_to_pattern(
-                        segments[seg_id - 1],
-                        pattern,
-                        reverse=True)
+                        segments[seg_id - 1], pattern, reverse=True
+                    )
 
                     prev_seg_offsets[1] = prev_seg_offsets[1] - new_offset
                     cur_seg_offsets[0] = cur_seg_offsets[0] - new_offset
 
-
                 if seg_id < (len(segments) - 1):
                     # extend_forwards
                     next_seg_offsets = segment_offsets[seg_id + 1]
-                    new_offset = self.compare_to_pattern(
-                        segments[seg_id + 1],
-                        pattern)
+                    new_offset = self.compare_to_pattern(segments[seg_id + 1], pattern)
 
                     next_seg_offsets[0] = next_seg_offsets[0] + new_offset
                     cur_seg_offsets[1] = cur_seg_offsets[1] + new_offset
@@ -348,14 +322,16 @@ class MismatchingLociLogic(object):
         offset = 0
 
         for segment in segments:
-            segment_offsets.append([offset, offset + len(segment), ])
+            segment_offsets.append(
+                [offset, offset + len(segment),]
+            )
             offset += len(segment)
 
         return segment_offsets
-            
+
     def telo_sequence_generator(self, pattern, offset):
 
-        offset_pattern = (pattern[offset:] + pattern)[:len(pattern)]
+        offset_pattern = (pattern[offset:] + pattern)[: len(pattern)]
         i = 0
         while True:
             yield i, offset_pattern[i % len(pattern)]
@@ -393,8 +369,7 @@ class MismatchingLociLogic(object):
 
     def print_mima(self, seq, qual, pat):
         print "-"
-        loci_status, mima_loci, fuse_loci =\
-            self.get_loci_status(seq, qual, pat)
+        loci_status, mima_loci, fuse_loci = self.get_loci_status(seq, qual, pat)
 
         print "Mima:", mima_loci
         print "Fuse:", fuse_loci
@@ -419,7 +394,6 @@ class MismatchingLociLogic(object):
 
 
 class VitalStatsFinder(object):
-
     def __init__(self, temp_dir, total_procs, task_size, trim_length=0):
         self.temp_dir = temp_dir
         self._total_procs = total_procs
@@ -429,35 +403,35 @@ class VitalStatsFinder(object):
     def __csv_to_dict__(self, stats_path):
         insert_dat = pd.read_csv(stats_path).to_dict(orient="record")[0]
 
-        ins_N = int(insert_dat['N'])
+        ins_N = int(insert_dat["N"])
         if ins_N == 0:
             insert_mean = -1
             insert_sd = -1
         else:
-            ins_sum = int(insert_dat['sum'])
-            ins_power_2 = int(insert_dat['power_2'])
+            ins_sum = int(insert_dat["sum"])
+            ins_power_2 = int(insert_dat["power_2"])
 
-            insert_mean, insert_sd = \
-                        self.__get_mean_and_sd__(ins_sum, ins_power_2, ins_N)
-    
-        min_qual = int(insert_dat['min_qual'])
-        qual_mean, qual_sd = \
-                self.__get_mean_and_sd__(insert_dat["qual_sum"],
-                                         insert_dat["qual_power_2"],
-                                         insert_dat["qual_N"])
+            insert_mean, insert_sd = self.__get_mean_and_sd__(ins_sum, ins_power_2, ins_N)
 
-        return {"insert_mean": insert_mean,
-                "insert_sd": insert_sd,
-                "min_qual": min_qual,
-                "max_qual": int(insert_dat['max_qual']),
-                "read_len": int(insert_dat['read_len']),
-                "qual_mean": qual_mean,
-                "qual_sd": qual_sd}
+        min_qual = int(insert_dat["min_qual"])
+        qual_mean, qual_sd = self.__get_mean_and_sd__(
+            insert_dat["qual_sum"], insert_dat["qual_power_2"], insert_dat["qual_N"]
+        )
+
+        return {
+            "insert_mean": insert_mean,
+            "insert_sd": insert_sd,
+            "min_qual": min_qual,
+            "max_qual": int(insert_dat["max_qual"]),
+            "read_len": int(insert_dat["read_len"]),
+            "qual_mean": qual_mean,
+            "qual_sd": qual_sd,
+        }
 
     def __get_mean_and_sd__(self, x_sum, x_power_2, x_N):
 
         x_mean = x_sum / x_N
-        x_sd = np.sqrt(float((x_N * x_power_2)) - float(x_sum**2)) / x_N
+        x_sd = np.sqrt(float((x_N * x_power_2)) - float(x_sum ** 2)) / x_N
 
         return x_mean, x_sd
 
@@ -470,7 +444,7 @@ class VitalStatsFinder(object):
 
         if self._trim_length > 0:
             vital_stats["read_len"] = self._trim_length
- 
+
         return vital_stats
 
     def __run_vital_rule__(self, sample_path, keep_in_temp=True):
@@ -480,9 +454,9 @@ class VitalStatsFinder(object):
             if read.is_read1 and read.is_proper_pair and read.mapq > 38:
                 insert_size = abs(read.template_length)
                 stats["sum"] = insert_size
-                stats["power_2"] = insert_size**2
+                stats["power_2"] = insert_size ** 2
                 stats["N"] = 1
-            
+
             stats["read_len"] = len(read.seq)
             byte_vals = map(ord, read.qual)
             min_qual = min(byte_vals)
@@ -490,7 +464,7 @@ class VitalStatsFinder(object):
 
             qual_mean = np.mean(byte_vals)
             stats["qual_sum"] = qual_mean
-            stats["qual_power_2"] = qual_mean**2
+            stats["qual_power_2"] = qual_mean ** 2
             stats["qual_N"] = 1
 
             stats["min_qual"] = min_qual
@@ -508,32 +482,26 @@ class VitalStatsFinder(object):
         structures["min_qual"] = {"data": 999, "store_method": "min"}
         structures["max_qual"] = {"data": 0, "store_method": "max"}
 
-
         structures["qual_sum"] = {"data": 0, "store_method": "cumu"}
         structures["qual_power_2"] = {"data": 0, "store_method": "cumu"}
         structures["qual_N"] = {"data": 0, "store_method": "cumu"}
 
-        stat_interface = parabam.Stat(temp_dir=self.temp_dir,
-                                      total_procs=self._total_procs,
-                                      task_size=10000,
-                                      keep_in_temp=keep_in_temp)
+        stat_interface = parabam.Stat(
+            temp_dir=self.temp_dir,
+            total_procs=self._total_procs,
+            task_size=10000,
+            keep_in_temp=keep_in_temp,
+        )
 
-        out_paths = stat_interface.run(input_paths=[sample_path],
-                                       constants={},
-                                       rule=rule,
-                                       struc_blueprint=structures)
+        out_paths = stat_interface.run(
+            input_paths=[sample_path], constants={}, rule=rule, struc_blueprint=structures
+        )
 
         return out_paths["global"]["stats"]
 
 
 class ReadStatsFactory(object):
-
-    def __init__(self,
-                 temp_dir,
-                 total_procs=4,
-                 task_size=5000,
-                 trim_reads=0,
-                 debug_print=False):
+    def __init__(self, temp_dir, total_procs=4, task_size=5000, trim_reads=0, debug_print=False):
 
         self.temp_dir = temp_dir
         self._total_procs = total_procs
@@ -547,15 +515,12 @@ class ReadStatsFactory(object):
 
         read_array = self.__path_to_read_array__(read_stat_paths["read_array"])
 
-        error_profile, sample_variance = \
-                    self.__paths_to_error_profile__(read_stat_paths)
+        error_profile, sample_variance = self.__paths_to_error_profile__(read_stat_paths)
 
-        read_counts = self.read_array_to_counts(read_array,
-                                                error_profile,
-                                                sample_variance)
+        read_counts = self.read_array_to_counts(read_array, error_profile, sample_variance)
 
         self.__delete_analysis_paths__(read_stat_paths)
-        
+
         return read_counts
 
     def __delete_analysis_paths__(self, read_stat_paths):
@@ -563,13 +528,11 @@ class ReadStatsFactory(object):
             os.remove(path)
 
     def __paths_to_error_profile__(self, read_stat_paths):
-        random_counts = pd.read_csv(read_stat_paths["random_counts"],
-                                    header=None).values
-        read_counts = pd.read_csv(read_stat_paths["mima_counts"],
-                                  header=None).values
+        random_counts = pd.read_csv(read_stat_paths["random_counts"], header=None).values
+        read_counts = pd.read_csv(read_stat_paths["mima_counts"], header=None).values
         error_profile = self.get_error_profile(read_counts, random_counts)
         sample_variance = self.__get_sample_variance__(read_counts)
-        
+
         return error_profile, sample_variance
 
     def __get_sample_variance__(self, read_counts):
@@ -577,44 +540,39 @@ class ReadStatsFactory(object):
         mask = read_counts > 0
         mask[40:, :] = False
 
-        read_variance = (read_counts[mask].std() / read_counts[mask].mean())
+        read_variance = read_counts[mask].std() / read_counts[mask].mean()
         return read_variance
 
     def get_error_profile(self, read_counts, random_counts, thresh=None):
-        error_profile = self.__get_significantly_enriched__(read_counts,
-                                                            random_counts,
-                                                            thresh)
+        error_profile = self.__get_significantly_enriched__(read_counts, random_counts, thresh)
 
         error_profile = self.__remove_noise__(error_profile)
         error_profile = self.__prune_error_profile__(error_profile)
         error_profile = self.__rationalise_error_profile__(error_profile)
 
-        error_profile[:int(read_counts.shape[0] * .1), :] = 1
+        error_profile[: int(read_counts.shape[0] * 0.1), :] = 1
 
         return error_profile
 
-    def __get_significantly_enriched__(self, read_counts,
-                                             random_counts,
-                                             thresh=None):
+    def __get_significantly_enriched__(self, read_counts, random_counts, thresh=None):
         dif_counts = read_counts - random_counts
-        ten_percent = int(read_counts.shape[0] * .1)
+        ten_percent = int(read_counts.shape[0] * 0.1)
 
         if thresh is None:
             mask = self.__get_exclusion_mask__(read_counts)
             arg_max_index = (read_counts * mask).argmax()
-            dif_loci_x, dif_loci_y = np.unravel_index(arg_max_index,
-                                                      dif_counts.shape)
+            dif_loci_x, dif_loci_y = np.unravel_index(arg_max_index, dif_counts.shape)
 
-            hi_thresh = dif_counts[int(dif_loci_x - ten_percent):
-                                   int(dif_loci_x + ten_percent),
-                                   dif_loci_y - 15:
-                                   dif_loci_y + 1]
+            hi_thresh = dif_counts[
+                int(dif_loci_x - ten_percent) : int(dif_loci_x + ten_percent),
+                dif_loci_y - 15 : dif_loci_y + 1,
+            ]
             hi_thresh = hi_thresh.flatten()
 
             thresh = np.percentile(hi_thresh, 95)
 
         if self._debug_print:
-            print 'Thresh:', thresh
+            print "Thresh:", thresh
 
         error_profile = (dif_counts * (dif_counts > 0)) > thresh
         error_profile = error_profile * 1
@@ -623,37 +581,35 @@ class ReadStatsFactory(object):
 
     def __remove_noise__(self, error_profile):
         row_max, col_max = error_profile.shape
-        error_profile[int(row_max * .11):, int(col_max * .7):] = 0
-        error_profile[int(row_max * .40):, 0] = 0
-        error_profile[int(row_max * .55):, :] = 0
+        error_profile[int(row_max * 0.11) :, int(col_max * 0.7) :] = 0
+        error_profile[int(row_max * 0.40) :, 0] = 0
+        error_profile[int(row_max * 0.55) :, :] = 0
 
         return error_profile
 
     def __get_exclusion_mask__(self, read_counts):
         mask = np.zeros(read_counts.shape)
-        x_start = int(read_counts.shape[0] * .2)
-        y_start = int(read_counts.shape[1] * .5)
+        x_start = int(read_counts.shape[0] * 0.2)
+        y_start = int(read_counts.shape[1] * 0.5)
         mask[x_start:, y_start:] = 1
         return mask
 
     def __prune_error_profile__(self, error_profile):
-        
+
         isolated_mask = self.__get_isolated_mask__(error_profile)
         continuous_mask = self.__get_continuous_mask__(error_profile)
 
-        combined_mask = ((isolated_mask + continuous_mask) > 0)
+        combined_mask = (isolated_mask + continuous_mask) > 0
 
         return error_profile * combined_mask
 
     def __get_continuous_mask__(self, error_profile):
         row_continuous = self.__transform_continous_matrix__(error_profile)
-        col_continuous = self.__transform_continous_matrix__(
-            error_profile.transpose())
+        col_continuous = self.__transform_continous_matrix__(error_profile.transpose())
         col_continuous = col_continuous.transpose()
 
         max_continuous = row_continuous * (row_continuous > col_continuous)
-        max_continuous = max_continuous + \
-                        (col_continuous * (col_continuous >= row_continuous))
+        max_continuous = max_continuous + (col_continuous * (col_continuous >= row_continuous))
 
         continusous_mask = max_continuous >= 4
         return continusous_mask
@@ -693,20 +649,19 @@ class ReadStatsFactory(object):
         return isolated_mask
 
     def __prune_decision__(self, row_i, col_i, error_profile):
-        neighbours = [(row_i - 1, col_i + 1),
-                      (row_i - 1, col_i),
-                      (row_i - 1, col_i - 1),
-                      (row_i, col_i + 1),
-                      (row_i, col_i - 1),
-                      (row_i + 1, col_i + 1),
-                      (row_i + 1, col_i),
-                      (row_i + 1, col_i - 1), ]
+        neighbours = [
+            (row_i - 1, col_i + 1),
+            (row_i - 1, col_i),
+            (row_i - 1, col_i - 1),
+            (row_i, col_i + 1),
+            (row_i, col_i - 1),
+            (row_i + 1, col_i + 1),
+            (row_i + 1, col_i),
+            (row_i + 1, col_i - 1),
+        ]
 
         try:
-            return self.__get_neighbor_sum__(row_i,
-                                             col_i,
-                                             error_profile,
-                                             neighbours) < 4
+            return self.__get_neighbor_sum__(row_i, col_i, error_profile, neighbours) < 4
         except IndexError:
             return False
 
@@ -739,8 +694,8 @@ class ReadStatsFactory(object):
 
                 # if cur_loci > global_loci:
                 global_loci = cur_loci
-                error_profile[i, :global_loci + 1] = True
-        
+                error_profile[i, : global_loci + 1] = True
+
         return error_profile
 
     def __array_to_file__(self, array, unique):
@@ -753,16 +708,17 @@ class ReadStatsFactory(object):
         return pd.read_csv(read_array_path, header=None).values
 
     def read_array_to_counts(self, read_array, error_profile, sample_variance):
-        complete_reads, boundary_reads = \
-            self.__get_complete_status__(read_array, error_profile)
+        complete_reads, boundary_reads = self.__get_complete_status__(read_array, error_profile)
 
         f2_count, f4_count = self.__get_boundary_counts__(boundary_reads)
         f1_count = self.__get_f1_count__(complete_reads)
 
-        return_dat = {"F2": int(f2_count),
-                      "F1": int(f1_count),
-                      "F4": f4_count,
-                      "sample_variance": sample_variance}
+        return_dat = {
+            "F2": int(f2_count),
+            "F1": int(f1_count),
+            "F4": f4_count,
+            "sample_variance": sample_variance,
+        }
 
         return return_dat
 
@@ -770,8 +726,7 @@ class ReadStatsFactory(object):
         return float(complete_reads.shape[0]) / 2
 
     def __get_boundary_counts__(self, boundary_reads):
-        f2_count, f4_count, total_reads = \
-            self.__get_read_counts__(boundary_reads)
+        f2_count, f4_count, total_reads = self.__get_read_counts__(boundary_reads)
         return f2_count, f4_count
 
     def __get_read_counts__(self, boundary_reads):
@@ -779,7 +734,7 @@ class ReadStatsFactory(object):
         f4_count = sum(boundary_reads[:, 3] == 0)
         total_reads = boundary_reads.shape[0]
         return f2_count, f4_count, total_reads
-        
+
     def __get_complete_status__(self, read_array, error_profile):
         boundary_indicies = []
         complete_indicies = []
@@ -796,15 +751,11 @@ class ReadStatsFactory(object):
             elif (not read) and pair:
                 boundary_indicies.append(i)
 
-        return read_array[complete_indicies, :],\
-                read_array[boundary_indicies, :]
+        return read_array[complete_indicies, :], read_array[boundary_indicies, :]
 
-    def run_read_stat_rule(self, path,
-                                 vital_stats,
-                                 keep_in_temp=True):
+    def run_read_stat_rule(self, path, vital_stats, keep_in_temp=True):
 
-        simple_read_factory = SimpleReadFactory(vital_stats,
-                                                trim_reads=self._trim)
+        simple_read_factory = SimpleReadFactory(vital_stats, trim_reads=self._trim)
         phred_offset = vital_stats["phred_offset"]
 
         maxtrix_max = (vital_stats["max_qual"] - phred_offset) + 1
@@ -812,18 +763,19 @@ class ReadStatsFactory(object):
 
         def get_return_stats(reads):
 
-            return_stats = [len(reads[0].mima_loci),
-                            int(reads[0].five_prime),
-                            len(reads[1].mima_loci),
-                            int(reads[1].five_prime),
-                            reads[0].avg_qual,
-                            reads[1].avg_qual]
+            return_stats = [
+                len(reads[0].mima_loci),
+                int(reads[0].five_prime),
+                len(reads[1].mima_loci),
+                int(reads[1].five_prime),
+                reads[0].avg_qual,
+                reads[1].avg_qual,
+            ]
 
             return return_stats
 
         def rule(reads, constants, master):
-            simple_reads = [simple_read_factory.get_simple_read(read)
-                                for read in reads]
+            simple_reads = [simple_read_factory.get_simple_read(read) for read in reads]
             return_dat = np.zeros((2, 6))
             return_dat[0, :] = get_return_stats(simple_reads)
             return_dat[1, :] = get_return_stats(simple_reads[::-1])
@@ -842,45 +794,47 @@ class ReadStatsFactory(object):
 
                     random_counts[int(sample_size), int(rand_avg)] += 1
 
-            results = {"read_array": np.array(return_dat),
-                       "random_counts": random_counts,
-                       "mima_counts": mima_counts}
+            results = {
+                "read_array": np.array(return_dat),
+                "random_counts": random_counts,
+                "mima_counts": mima_counts,
+            }
 
             return results
 
-        structures = {"read_array": {"data": np.zeros((2, 6)),
-                                     "store_method": "vstack"},
-                      "mima_counts": {"data": np.zeros(matrix_shape),
-                                      "store_method": "cumu"},
-                      "random_counts": {"data": np.zeros(matrix_shape),
-                                        "store_method": "cumu"}, }
+        structures = {
+            "read_array": {"data": np.zeros((2, 6)), "store_method": "vstack"},
+            "mima_counts": {"data": np.zeros(matrix_shape), "store_method": "cumu"},
+            "random_counts": {"data": np.zeros(matrix_shape), "store_method": "cumu"},
+        }
 
-        stat_interface = parabam.Stat(temp_dir=self.temp_dir,
-                                      pair_process=True,
-                                      total_procs=self._total_procs,
-                                      task_size=self._task_size,
-                                      keep_in_temp=keep_in_temp,
-                                      verbose=0)
+        stat_interface = parabam.Stat(
+            temp_dir=self.temp_dir,
+            pair_process=True,
+            total_procs=self._total_procs,
+            task_size=self._task_size,
+            keep_in_temp=keep_in_temp,
+            verbose=0,
+        )
 
         out_paths = stat_interface.run(
-            input_paths=[path],
-            constants={},
-            rule=rule,
-            struc_blueprint=structures)
+            input_paths=[path], constants={}, rule=rule, struc_blueprint=structures
+        )
 
         return out_paths[path]
 
 
 class Telbam2Length(TelomerecatInterface):
-
-    def __init__(self,
-                 temp_dir=None,
-                 task_size=10000,
-                 total_procs=8,
-                 reader_n=2,
-                 verbose=False,
-                 announce=True,
-                 cmd_run=False):
+    def __init__(
+        self,
+        temp_dir=None,
+        task_size=10000,
+        total_procs=8,
+        reader_n=2,
+        verbose=False,
+        announce=True,
+        cmd_run=False,
+    ):
 
         super(Telbam2Length, self).__init__(
             instance_name="telomerecat telbam2length",
@@ -890,23 +844,29 @@ class Telbam2Length(TelomerecatInterface):
             reader_n=reader_n,
             verbose=verbose,
             announce=announce,
-            cmd_run=cmd_run)
+            cmd_run=cmd_run,
+        )
 
     def run_cmd(self):
-        self.run(input_paths=self.cmd_args.input,
-                 trim=self.cmd_args.trim,
-                 output_path=self.cmd_args.output,
-                 simulator_n=self.cmd_args.simulator_runs,
-                 correct_f2a=self.cmd_args.enable_correction,
-                 inserts_path=self.cmd_args.insert)
+        self.run(
+            input_paths=self.cmd_args.input,
+            trim=self.cmd_args.trim,
+            output_path=self.cmd_args.output,
+            simulator_n=self.cmd_args.simulator_runs,
+            correct_f2a=self.cmd_args.enable_correction,
+            inserts_path=self.cmd_args.insert,
+        )
 
-    def run(self, input_paths,
-                  trim=0,
-                  output_path=None,
-                  correct_f2a=False,
-                  simulator_n=10,
-                  inserts_path=None):
-        
+    def run(
+        self,
+        input_paths,
+        trim=0,
+        output_path=None,
+        correct_f2a=False,
+        simulator_n=10,
+        inserts_path=None,
+    ):
+
         """The main function for invoking the part of the
            program which creates a telbam from a bam
 
@@ -927,48 +887,47 @@ class Telbam2Length(TelomerecatInterface):
         temp_csv_path = self.__get_temp_path__()
 
         insert_length_generator = self.__get_insert_generator__(inserts_path)
-        
-        self.__output__(" Collecting meta-data for all samples | %s\n" \
-                            % (self.__get_date_time__(),), 1)
 
-        vital_stats_finder = VitalStatsFinder(self.temp_dir,
-                                              self.total_procs,
-                                              self.task_size,
-                                              trim)
+        self.__output__(
+            " Collecting meta-data for all samples | %s\n" % (self.__get_date_time__(),), 1
+        )
+
+        vital_stats_finder = VitalStatsFinder(
+            self.temp_dir, self.total_procs, self.task_size, trim
+        )
 
         for sample_path, sample_name, in izip(input_paths, names):
-            sample_intro = "\t- %s | %s\n" % (sample_name,
-                                              self.__get_date_time__())
+            sample_intro = "\t- %s | %s\n" % (sample_name, self.__get_date_time__())
 
             self.__output__(sample_intro, 2)
 
             vital_stats = vital_stats_finder.get_vital_stats(sample_path)
 
-            self.__check_vital_stats_insert_size__(inserts_path,
-                                                    insert_length_generator,
-                                                    vital_stats)
+            self.__check_vital_stats_insert_size__(
+                inserts_path, insert_length_generator, vital_stats
+            )
 
-            read_type_counts = self.__get_read_types__(sample_path,
-                                                       vital_stats,
-                                                       self.total_procs,
-                                                       trim)
+            read_type_counts = self.__get_read_types__(
+                sample_path, vital_stats, self.total_procs, trim
+            )
 
-            self.__write_to_csv__(read_type_counts,
-                                    vital_stats,
-                                    temp_csv_path,
-                                    sample_name)
-        
+            self.__write_to_csv__(read_type_counts, vital_stats, temp_csv_path, sample_name)
+
         self.__output__("\n", 1)
-        length_interface = Csv2Length(temp_dir=self.temp_dir,
-                                       total_procs=self.total_procs,
-                                       verbose=self.verbose,
-                                       announce=False,
-                                       cmd_run=False)
+        length_interface = Csv2Length(
+            temp_dir=self.temp_dir,
+            total_procs=self.total_procs,
+            verbose=self.verbose,
+            announce=False,
+            cmd_run=False,
+        )
 
-        length_interface.run(input_paths=[temp_csv_path],
-                             output_paths=[output_csv_path],
-                             correct_f2a=correct_f2a,
-                             simulator_n=simulator_n)
+        length_interface.run(
+            input_paths=[temp_csv_path],
+            output_paths=[output_csv_path],
+            correct_f2a=correct_f2a,
+            simulator_n=simulator_n,
+        )
 
         self.__print_output_information__(output_csv_path)
         self.__goodbye__()
@@ -976,8 +935,7 @@ class Telbam2Length(TelomerecatInterface):
         return output_csv_path
 
     def __print_output_information__(self, output_csv_path):
-        self.__output__((" Length estimation results "
-                         "written to the following file:\n"), 1)
+        self.__output__((" Length estimation results " "written to the following file:\n"), 1)
         self.__output__("\t./%s\n\n" % (os.path.basename(output_csv_path,)))
 
     def __get_insert_generator__(self, inserts_path):
@@ -986,52 +944,47 @@ class Telbam2Length(TelomerecatInterface):
                 for line in inserts_file:
                     yield map(float, line.split(","))
 
-    def __check_vital_stats_insert_size__(self,
-                                          inserts_path,
-                                          insert_length_generator,
-                                          vital_stats):
+    def __check_vital_stats_insert_size__(
+        self, inserts_path, insert_length_generator, vital_stats
+    ):
         if inserts_path:
             insert_mean, insert_sd = insert_length_generator.next()
             vital_stats["insert_mean"] = insert_mean
             vital_stats["insert_sd"] = insert_sd
             self.__output__(
-                "\t\t+ Using user defined insert size: %d,%d\n"
-                % (insert_mean, insert_sd), 2)
+                "\t\t+ Using user defined insert size: %d,%d\n" % (insert_mean, insert_sd), 2
+            )
         elif vital_stats["insert_mean"] == -1:
             default_mean, default_sd = 350, 25
             vital_stats["insert_mean"] = 350
             vital_stats["insert_sd"] = 25
             self.__output__(
                 "\t\t+ Failed to estimate insert size. Using default: %d,%d\n"
-                % (default_mean, default_sd), 2)
+                % (default_mean, default_sd),
+                2,
+            )
 
-    def __get_read_types__(self, sample_path,
-                                 vital_stats,
-                                 total_procs,
-                                 trim,
-                                 read_stats_factory=None):
+    def __get_read_types__(
+        self, sample_path, vital_stats, total_procs, trim, read_stats_factory=None
+    ):
 
         if read_stats_factory is None:
-            read_stats_factory = ReadStatsFactory(temp_dir=self.temp_dir,
-                                                  total_procs=total_procs,
-                                                  trim_reads=trim,
-                                                  debug_print=False)
-            
-        read_type_counts = read_stats_factory.get_read_counts(sample_path,
-                                                              vital_stats)
+            read_stats_factory = ReadStatsFactory(
+                temp_dir=self.temp_dir, total_procs=total_procs, trim_reads=trim, debug_print=False
+            )
+
+        read_type_counts = read_stats_factory.get_read_counts(sample_path, vital_stats)
         return read_type_counts
 
     def __get_temp_path__(self):
-        temp_path = os.path.join(self.temp_dir, "telomerecat_temp_%d.csv" \
-                                                            % (time.time()))
+        temp_path = os.path.join(self.temp_dir, "telomerecat_temp_%d.csv" % (time.time()))
         self.__create_output_file__(temp_path)
         return temp_path
 
     def __get_output_path__(self, user_output_path):
         tmct_output_path = None
         if user_output_path is None:
-            tmct_output_path = os.path.join("./telomerecat_length_%d.csv" \
-                                                            % (time.time(),))
+            tmct_output_path = os.path.join("./telomerecat_length_%d.csv" % (time.time(),))
         else:
             tmct_output_path = user_output_path
 
@@ -1039,32 +992,33 @@ class Telbam2Length(TelomerecatInterface):
 
     def __create_output_file__(self, output_csv_path):
         with open(output_csv_path, "w") as total:
-            header = ("Sample,F1,F2,F4,Psi,Insert_mean,Insert_sd,"
-                      "Read_length,Initial_read_length\n")
+            header = (
+                "Sample,F1,F2,F4,Psi,Insert_mean,Insert_sd," "Read_length,Initial_read_length\n"
+            )
             total.write(header)
         return output_csv_path
 
-    def __write_to_csv__(self,
-                         read_type_counts,
-                         vital_stats,
-                         output_csv_path,
-                         name):
+    def __write_to_csv__(self, read_type_counts, vital_stats, output_csv_path, name):
         with open(output_csv_path, "a") as counts:
-            counts.write("%s,%d,%d,%d,%.3f,%.3f,%.3f,%d,%d\n" % \
-                                        (name,
-                                         read_type_counts["F1"],
-                                         read_type_counts["F2"],
-                                         read_type_counts["F4"],
-                                         read_type_counts["sample_variance"],
-                                         vital_stats["insert_mean"],
-                                         vital_stats["insert_sd"],
-                                         vital_stats["read_len"],
-                                         vital_stats["initial_read_len"]))
+            counts.write(
+                "%s,%d,%d,%d,%.3f,%.3f,%.3f,%d,%d\n"
+                % (
+                    name,
+                    read_type_counts["F1"],
+                    read_type_counts["F2"],
+                    read_type_counts["F4"],
+                    read_type_counts["sample_variance"],
+                    vital_stats["insert_mean"],
+                    vital_stats["insert_sd"],
+                    vital_stats["read_len"],
+                    vital_stats["initial_read_len"],
+                )
+            )
 
     def get_parser(self):
         parser = self.default_parser()
         parser.description = textwrap.dedent(
-        '''\
+            """\
         %s
         %s
 
@@ -1079,29 +1033,45 @@ class Telbam2Length(TelomerecatInterface):
             for the `some_telbam.bam` file.
 
         %s
-        ''' % (self.instance_name,
-               self.header_line,
-               self.header_line,))
+        """
+            % (self.instance_name, self.header_line, self.header_line,)
+        )
 
         parser.add_argument(
-            'input', metavar='TELBAM(S)', nargs='+',
-            help="The TELBAM(s) that we wish to analyse")
+            "input", metavar="TELBAM(S)", nargs="+", help="The TELBAM(s) that we wish to analyse"
+        )
         parser.add_argument(
-            '--output', metavar='CSV', type=str, nargs='?', default=None,
-            help=('Specify output path for length estimation CSV.\n'
-                  'Automatically generated if left blank [Default: None]'))
+            "--output",
+            metavar="CSV",
+            type=str,
+            nargs="?",
+            default=None,
+            help=(
+                "Specify output path for length estimation CSV.\n"
+                "Automatically generated if left blank [Default: None]"
+            ),
+        )
         parser.add_argument(
-            '-s', type=int, nargs='?', default=10000,
-            help=("The amount of reads considered by each\n"
-                  "distributed task. [Default: 10000]"))
+            "-s",
+            type=int,
+            nargs="?",
+            default=10000,
+            help=("The amount of reads considered by each\n" "distributed task. [Default: 10000]"),
+        )
         parser.add_argument(
-            '-t', "--trim", type=int, nargs='?', default=0,
+            "-t",
+            "--trim",
+            type=int,
+            nargs="?",
+            default=0,
             help="Use only the amount of sequence specified by this  \n"
-                  "option (i.e if the value 90 is supplied\n"
-                  "then only the first 90 bases are\n"
-                  "considered) [Default: Whole read]")
+            "option (i.e if the value 90 is supplied\n"
+            "then only the first 90 bases are\n"
+            "considered) [Default: Whole read]",
+        )
 
         return parser
+
 
 if __name__ == "__main__":
     print "Do not run this script directly. Type `telomerecat` for help."

@@ -1,4 +1,3 @@
-
 """
 Generate TL estimates given a CSV file.
 
@@ -27,9 +26,7 @@ from telomerecat import core
 
 
 class LengthSimulator(object):
-    def __init__(self, insert_mu, insert_sigma,
-                    complete, boundary,
-                    read_len=100):
+    def __init__(self, insert_mu, insert_sigma, complete, boundary, read_len=100):
 
         self._insert_mu = insert_mu
         self._insert_sigma = insert_sigma
@@ -42,8 +39,8 @@ class LengthSimulator(object):
         self._read_len = read_len
         self._read_sim = self.__simulate_reads__
 
-        self._get_read_len = (lambda: self._read_len)
-        
+        self._get_read_len = lambda: self._read_len
+
     def start(self):
         if self._boundary <= 0 or self._complete <= 0:
             return 0
@@ -53,8 +50,7 @@ class LengthSimulator(object):
     def __run_sim__(self):
         found = False
 
-        tel_len = int((float(self._complete) / self._boundary) *
-                              (self._insert_mu - 100))
+        tel_len = int((float(self._complete) / self._boundary) * (self._insert_mu - 100))
         max_its = 5000
         its = 0
 
@@ -64,7 +60,7 @@ class LengthSimulator(object):
         read_simulator = self._read_sim
         get_factor = self.__get_factor__
 
-        while(not found and its < max_its):
+        while not found and its < max_its:
             sim_comp, sim_boun, invalid_reads = read_simulator(tel_len)
             #   result can be positive or negative thus
             #   influencing elongation and shortening
@@ -97,8 +93,7 @@ class LengthSimulator(object):
         elif abs_result < (total * 0.5):
             factor = random.sample([20, 50, 100, 200, 1000, 2000], 1)[0]
         else:
-            factor = \
-                int(np.log(abs_result) * 300) / random.sample([1, 2], 1)[0]
+            factor = int(np.log(abs_result) * 300) / random.sample([1, 2], 1)[0]
         return factor
 
     def is_same_ratio(self, comp, boun):
@@ -110,7 +105,7 @@ class LengthSimulator(object):
 
     def __simulate_reads__(self, tel_len):
         if tel_len < self._insert_mu:
-            return int(self._complete * .50), self._boundary, 0
+            return int(self._complete * 0.50), self._boundary, 0
 
         #  speedup
         is_complete = self.is_complete
@@ -128,7 +123,7 @@ class LengthSimulator(object):
         total = 0
 
         while total < (obs_total):
-            insert_size = (random.gauss(insert_mean, insert_sigma))
+            insert_size = random.gauss(insert_mean, insert_sigma)
             location = random.randint(0, tel_len)
             if is_complete(location, insert_size):
                 est_complete += 1
@@ -149,13 +144,7 @@ class LengthSimulator(object):
 
 
 class Csv2Length(core.TelomerecatInterface):
-
-    def __init__(self,
-                 temp_dir=None,
-                 total_procs=8,
-                 verbose=False,
-                 announce=True,
-                 cmd_run=False):
+    def __init__(self, temp_dir=None, total_procs=8, verbose=False, announce=True, cmd_run=False):
 
         super(Csv2Length, self).__init__(
             instance_name="telomerecat csv2length",
@@ -163,28 +152,26 @@ class Csv2Length(core.TelomerecatInterface):
             total_procs=total_procs,
             verbose=verbose,
             announce=announce,
-            cmd_run=cmd_run)
+            cmd_run=cmd_run,
+        )
 
     def run_cmd(self):
         output_paths = self.__handle_cmd_outpaths__()
 
-        self.run(input_paths=self.cmd_args.input,
-                 correct_f2a=not self.cmd_args.disable_correction,
-                 output_paths=output_paths,
-                 prior_weight=self.cmd_args.prior_weight,
-                 simulator_n=self.cmd_args.simulator_runs)
+        self.run(
+            input_paths=self.cmd_args.input,
+            correct_f2a=not self.cmd_args.disable_correction,
+            output_paths=output_paths,
+            prior_weight=self.cmd_args.prior_weight,
+            simulator_n=self.cmd_args.simulator_runs,
+        )
 
-    def run(self, input_paths,
-                  output_paths=[],
-                  correct_f2a=True,
-                  prior_weight=3,
-                  simulator_n=10):
-        
+    def run(self, input_paths, output_paths=[], correct_f2a=True, prior_weight=3, simulator_n=10):
+
         self.__introduce__()
         self.__generate_output_paths__(input_paths, output_paths)
 
-        self.__output__(" Commencing length estimation | %s\n"
-                            % (self.__get_date_time__(),), 1)
+        self.__output__(" Commencing length estimation | %s\n" % (self.__get_date_time__(),), 1)
 
         for input_path, output_path in izip(input_paths, output_paths):
             if self.announce:
@@ -192,10 +179,9 @@ class Csv2Length(core.TelomerecatInterface):
                 self.__output__(" \tOutput: %s\n" % (output_path,), 1)
 
             counts = pd.read_csv(input_path)
-            counts = self.__get_length_from_dataframe__(counts,
-                                                        simulator_n,
-                                                        correct_f2a,
-                                                        prior_weight)
+            counts = self.__get_length_from_dataframe__(
+                counts, simulator_n, correct_f2a, prior_weight
+            )
 
             self.__output_length_results__(counts, output_path)
             self.__output__("\n", 1)
@@ -213,19 +199,17 @@ class Csv2Length(core.TelomerecatInterface):
 
         return output_paths
 
-    def __get_length_from_dataframe__(self, counts,
-                                        simulator_n,
-                                        correct_f2a=True,
-                                        prior_weight=3,
-                                        simulate_lengths=True,):
-        
+    def __get_length_from_dataframe__(
+        self, counts, simulator_n, correct_f2a=True, prior_weight=3, simulate_lengths=True,
+    ):
+
         counts["F2a"] = counts["F2"] - counts["F4"]
 
         if correct_f2a:
             counts["F2a_c"] = self.__get_corrected_f2a__(counts, prior_weight)
         else:
             counts["F2a_c"] = counts["F2a"]
-        
+
         if simulate_lengths:
             counts["Length"] = self.__get_lengths__(counts, simulator_n)
         else:
@@ -240,9 +224,9 @@ class Csv2Length(core.TelomerecatInterface):
         prior_weight = 3
         theta_expected = sum(theta_observed * counts["F2"]) / sum(counts["F2"])
 
-        theta_corrected = ((theta_observed * (counts["Psi"])) +
-                             (theta_expected * prior_weight)) \
-                                / ((counts["Psi"]) + (prior_weight))
+        theta_corrected = (
+            (theta_observed * (counts["Psi"])) + (theta_expected * prior_weight)
+        ) / ((counts["Psi"]) + (prior_weight))
 
         corrected_f2_counts = (counts["F2"] + counts["F4"]) * theta_corrected
 
@@ -251,19 +235,16 @@ class Csv2Length(core.TelomerecatInterface):
     def __quick_length__(self, counts):
         lengths = []
         for i, sample in counts.iterrows():
-            factor = sample["Read_length"] /\
-                (sample["F2a_c"] - sample["Read_length"])
+            factor = sample["Read_length"] / (sample["F2a_c"] - sample["Read_length"])
             scale = sample["F2a_c"] + (sample["F2a_c"] * factor)
-            length = ((sample["F1"] / scale) *
-                        sample["Insert_mean"]) + sample["Insert_mean"]
+            length = ((sample["F1"] / scale) * sample["Insert_mean"]) + sample["Insert_mean"]
             lengths.append(round(length, 3))
         return lengths
 
     def __get_lengths__(self, counts, simulator_n):
         lengths = []
         for i, sample in counts.iterrows():
-            sample_intro = "\t- %s | %s\n" % (sample["Sample"],
-                                              self.__get_date_time__())
+            sample_intro = "\t- %s | %s\n" % (sample["Sample"], self.__get_date_time__())
             self.__output__(sample_intro, 2)
 
             length_mean, len_std = run_simulator_par(
@@ -273,7 +254,8 @@ class Csv2Length(core.TelomerecatInterface):
                 sample["F2a_c"],
                 self.total_procs,
                 sample["Read_length"],
-                simulator_n)
+                simulator_n,
+            )
 
             lengths.append(length_mean)
         return lengths
@@ -281,8 +263,7 @@ class Csv2Length(core.TelomerecatInterface):
     def __generate_output_paths__(self, input_paths, output_paths):
         if len(output_paths) < len(input_paths):
             for i in xrange(len(input_paths)):
-                path = \
-                    "./telomerecat_length_%d_%d.csv" % (time.time(), i)
+                path = "./telomerecat_length_%d_%d.csv" % (time.time(), i)
                 output_paths.append(path)
 
     def __output_length_results__(self, counts, count_path):
@@ -294,7 +275,7 @@ class Csv2Length(core.TelomerecatInterface):
     def get_parser(self):
         parser = self.default_parser()
         parser.description = textwrap.dedent(
-        '''\
+            """\
         %s
         %s
 
@@ -312,23 +293,29 @@ class Csv2Length(core.TelomerecatInterface):
             estimates for the `telomerecat_length_123.csv` file.
 
         %s
-        ''' % (self.instance_name,
-               self.header_line,
-               self.header_line,))
+        """
+            % (self.instance_name, self.header_line, self.header_line,)
+        )
 
         parser.add_argument(
-            'input', metavar='CSV(s)', nargs='+',
-            help="The CSV(s) that we wish to reanalyse")
+            "input", metavar="CSV(s)", nargs="+", help="The CSV(s) that we wish to reanalyse"
+        )
         parser.add_argument(
-            '--output',
-            metavar='CSV', type=str, nargs='?', default=None,
-            help=('Specify output path for length estimation CSV.\n'
-                  'If more than one input CSV is provided\n'
-                  'the user will need to provide a comma seperated list\n'
-                  'with one entry per input. For example:\n\t'
-                  '--output=\"zzz.csv, yyy.csv\". [Default: None]'))
-        parser.add_argument('-s', help=SUPPRESS)
-        parser.add_argument('-f', help=SUPPRESS)
+            "--output",
+            metavar="CSV",
+            type=str,
+            nargs="?",
+            default=None,
+            help=(
+                "Specify output path for length estimation CSV.\n"
+                "If more than one input CSV is provided\n"
+                "the user will need to provide a comma seperated list\n"
+                "with one entry per input. For example:\n\t"
+                '--output="zzz.csv, yyy.csv". [Default: None]'
+            ),
+        )
+        parser.add_argument("-s", help=SUPPRESS)
+        parser.add_argument("-f", help=SUPPRESS)
 
         return parser
 
@@ -339,28 +326,21 @@ class Csv2Length(core.TelomerecatInterface):
  class bound methods
 """
 
+
 def check_results(sim_results):
     if 0 in sim_results:
         sys.stderr.write(
-        "[WARNING] Telomere length reported zero. This means telomercat\n" +
-        "\tfailed to identify enough complete or boundary reads.\n" +
-        "\tThis  may mean your original sample was preprocessed to remove \n" +
-        "\ttelomere reads. Alternatively this sample could have \n" +
-        "\tvery short average TL.\n")
+            "[WARNING] Telomere length reported zero. This means telomercat\n"
+            + "\tfailed to identify enough complete or boundary reads.\n"
+            + "\tThis  may mean your original sample was preprocessed to remove \n"
+            + "\ttelomere reads. Alternatively this sample could have \n"
+            + "\tvery short average TL.\n"
+        )
 
-def run_simulator(insert_mu,
-                  insert_sigma,
-                  complete,
-                  boundary,
-                  proc,
-                  read_len,
-                  n=10):
 
-    simmer = LengthSimulator(insert_mu,
-                             insert_sigma,
-                             complete,
-                             boundary,
-                             read_len)
+def run_simulator(insert_mu, insert_sigma, complete, boundary, proc, read_len, n=10):
+
+    simmer = LengthSimulator(insert_mu, insert_sigma, complete, boundary, read_len)
     res = []
     invalid_count = []
     for i in range(n):
@@ -372,40 +352,31 @@ def run_simulator(insert_mu,
     return (np.mean(res), np.std(res))
 
 
-def estimator_process(job,
-                      insert_mu,
-                      insert_sigma,
-                      complete,
-                      boundary,
-                      read_len):
+def estimator_process(job, insert_mu, insert_sigma, complete, boundary, read_len):
 
-    length_estimator = LengthSimulator(insert_mu,
-                                       insert_sigma,
-                                       complete,
-                                       boundary,
-                                       read_len)
+    length_estimator = LengthSimulator(insert_mu, insert_sigma, complete, boundary, read_len)
     results = length_estimator.start()
     return results
 
 
-def run_simulator_par(insert_mu,
-                      insert_sigma,
-                      complete,
-                      boundary,
-                      proc,
-                      read_len,
-                      simulator_n):
+def run_simulator_par(insert_mu, insert_sigma, complete, boundary, proc, read_len, simulator_n):
 
     freeze_support()
     p = Pool(proc)
-    sim_partial = partial(estimator_process, insert_mu=insert_mu,
-                          insert_sigma=insert_sigma, complete=complete,
-                          boundary=boundary, read_len=read_len)
+    sim_partial = partial(
+        estimator_process,
+        insert_mu=insert_mu,
+        insert_sigma=insert_sigma,
+        complete=complete,
+        boundary=boundary,
+        read_len=read_len,
+    )
 
     results = p.map(sim_partial, range(simulator_n))
     p.close()
     check_results(results)
     return (np.mean(results), np.std(results))
+
 
 if __name__ == "__main__":
     print "Do not run this script directly. Type `telomerecat` for help."

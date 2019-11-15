@@ -1,4 +1,3 @@
-
 """
 Create TELBAMS given a set of BAM files.
 
@@ -14,9 +13,9 @@ import gc
 
 import parabam
 
-#Here we define what constitutes a telomereic read.
-#If both reads in a pair match the critea we store
-#them to the telbam
+# Here we define what constitutes a telomereic read.
+# If both reads in a pair match the critea we store
+# them to the telbam
 def rule(reads, constants, master):
     tel_pats = constants["tel_pats"]
     telomere_status = False
@@ -29,39 +28,44 @@ def rule(reads, constants, master):
 
     results = []
     if telomere_status:
-        results = [("telbam",reads[0]),("telbam",reads[1])]
+        results = [("telbam", reads[0]), ("telbam", reads[1])]
     return results
 
-#This whole package is essentially just a wrapper for a call to parabam subset
-class Bam2Telbam(parabam.core.Interface):
-    '''Interface to interact with telomerecat programatically. This interface
-    is also called by the `telomerecat` script'''
-    def __init__(self,
-                 temp_dir=None,
-                 task_size=250000,
-                 total_procs=8,
-                 reader_n=2,
-                 verbose=False,
-                 announce=True,
-                 cmd_run=False):
 
-        super(Bam2Telbam,self).__init__(instance_name = \
-                                            "telomerecat bam2telbam", 
-                                        temp_dir=temp_dir,
-                                        task_size=task_size,
-                                        total_procs=total_procs,
-                                        reader_n=reader_n,
-                                        verbose=verbose,
-                                        announce = announce,
-                                        cmd_run=cmd_run)
+# This whole package is essentially just a wrapper for a call to parabam subset
+class Bam2Telbam(parabam.core.Interface):
+    """Interface to interact with telomerecat programatically. This interface
+    is also called by the `telomerecat` script"""
+
+    def __init__(
+        self,
+        temp_dir=None,
+        task_size=250000,
+        total_procs=8,
+        reader_n=2,
+        verbose=False,
+        announce=True,
+        cmd_run=False,
+    ):
+
+        super(Bam2Telbam, self).__init__(
+            instance_name="telomerecat bam2telbam",
+            temp_dir=temp_dir,
+            task_size=task_size,
+            total_procs=total_procs,
+            reader_n=reader_n,
+            verbose=verbose,
+            announce=announce,
+            cmd_run=cmd_run,
+        )
 
     def run_cmd(self):
         """Called from the master `telomerecat` script which handels the
         cmd line interface. Requires an argparse parser. Users should call
         the `run` function."""
-        self.run(input_paths = self.cmd_args.input)
+        self.run(input_paths=self.cmd_args.input)
 
-    def run(self,input_paths, keep_in_temp = False):
+    def run(self, input_paths, keep_in_temp=False):
         """The main function for invoking the part of the 
            program which creates a telbam from a bam
 
@@ -77,12 +81,11 @@ class Bam2Telbam(parabam.core.Interface):
 
         self.__introduce__()
 
-        subset_types=["telbam"]
-        tel_pats = ["TTAGGGTTAGGG","CCCTAACCCTAA"]
+        subset_types = ["telbam"]
+        tel_pats = ["TTAGGGTTAGGG", "CCCTAACCCTAA"]
 
-        #need to define my constants and engine here:
-        telbam_constants = {"thresh":1,
-                            "tel_pats":tel_pats}
+        # need to define my constants and engine here:
+        telbam_constants = {"thresh": 1, "tel_pats": tel_pats}
 
         final_output_paths = {}
 
@@ -90,25 +93,31 @@ class Bam2Telbam(parabam.core.Interface):
 
             if self.verbose:
                 sys.stdout.write(" Generating TELBAM from: %s\n" % (input_path,))
-                sys.stdout.write("\t- TELBAM generation started %s\n" %\
-                                    (self.__get_date_time__(),))
+                sys.stdout.write(
+                    "\t- TELBAM generation started %s\n" % (self.__get_date_time__(),)
+                )
 
-            subset_interface = parabam.Subset(temp_dir=self.temp_dir,
-                                              total_procs=self.total_procs,
-                                              task_size=self.task_size,
-                                              reader_n=self.reader_n,
-                                              verbose=self.verbose,
-                                              pair_process=True,
-                                              include_duplicates=True,
-                                              keep_in_temp=keep_in_temp)
-            #call to parabam subset
-            telbam_paths = subset_interface.run(input_paths=[input_path],
-                                                subsets=subset_types,
-                                                constants = telbam_constants,
-                                                rule = rule)
+            subset_interface = parabam.Subset(
+                temp_dir=self.temp_dir,
+                total_procs=self.total_procs,
+                task_size=self.task_size,
+                reader_n=self.reader_n,
+                verbose=self.verbose,
+                pair_process=True,
+                include_duplicates=True,
+                keep_in_temp=keep_in_temp,
+            )
+            # call to parabam subset
+            telbam_paths = subset_interface.run(
+                input_paths=[input_path],
+                subsets=subset_types,
+                constants=telbam_constants,
+                rule=rule,
+            )
             if self.verbose:
-                sys.stdout.write("\t- TELBAM generation finished %s\n\n"\
-                                     % (self.__get_date_time__(),))
+                sys.stdout.write(
+                    "\t- TELBAM generation finished %s\n\n" % (self.__get_date_time__(),)
+                )
 
             gc.collect()
             final_output_paths.update(telbam_paths)
@@ -118,7 +127,8 @@ class Bam2Telbam(parabam.core.Interface):
 
     def get_parser(self):
         parser = self.default_parser()
-        parser.description = textwrap.dedent('''\
+        parser.description = textwrap.dedent(
+            """\
         %s
         %s
 
@@ -145,12 +155,16 @@ class Bam2Telbam(parabam.core.Interface):
              type `telomerecat telbam2length` into your terminal
 
         %s
-         ''' % (self.instance_name, 
-               self.header_line, 
-               self.header_line,))
+         """
+            % (self.instance_name, self.header_line, self.header_line,)
+        )
 
-        parser.add_argument('input',metavar='BAM(S)', nargs='+',
-            help='BAM file(s) for which we wish to generate TELBAMS')
+        parser.add_argument(
+            "input",
+            metavar="BAM(S)",
+            nargs="+",
+            help="BAM file(s) for which we wish to generate TELBAMS",
+        )
 
         return parser
 
@@ -158,4 +172,4 @@ class Bam2Telbam(parabam.core.Interface):
 if __name__ == "__main__":
     print "Type telomerecat -h for help!"
 
-#....happily ever after.
+# ....happily ever after.

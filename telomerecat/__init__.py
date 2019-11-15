@@ -1,4 +1,4 @@
-#__init__.py
+# __init__.py
 import core
 
 from telomerecat.csv2length import Csv2Length
