@@ -3,8 +3,7 @@ import os
 import sys
 import shutil
 
-# Instalise the __version__ variable
-execfile("./telomerecat/_version.py")
+from telomerecat.version import __version__
 
 setup(
   name="telomerecat",

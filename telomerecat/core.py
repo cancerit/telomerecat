@@ -11,9 +11,7 @@ import parabam
 from abc import ABCMeta
 
 
-class TelomerecatInterface(parabam.core.Interface):
-
-  __metaclass__ = ABCMeta
+class TelomerecatInterface(parabam.core.Interface, metaclass=ABCMeta):
 
   def __init__(
     self,

@@ -170,6 +170,6 @@ class Bam2Telbam(parabam.core.Interface):
 
 
 if __name__ == "__main__":
-  print "Type telomerecat -h for help!"
+  print("Type telomerecat -h for help!")
 
 # ....happily ever after.

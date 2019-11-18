@@ -19,7 +19,6 @@ import pandas as pd
 from argparse import SUPPRESS
 from functools import partial
 from shutil import copy
-from itertools import izip
 from multiprocessing import Pool, freeze_support
 
 from telomerecat import core
@@ -173,7 +172,7 @@ class Csv2Length(core.TelomerecatInterface):
 
     self.__output__(" Commencing length estimation | %s\n" % (self.__get_date_time__(),), 1)
 
-    for input_path, output_path in izip(input_paths, output_paths):
+    for input_path, output_path in zip(input_paths, output_paths):
       if self.announce:
         self.__output__("\tInput: %s\n" % (input_path,), 1)
         self.__output__(" \tOutput: %s\n" % (output_path,), 1)
@@ -262,7 +261,7 @@ class Csv2Length(core.TelomerecatInterface):
 
   def __generate_output_paths__(self, input_paths, output_paths):
     if len(output_paths) < len(input_paths):
-      for i in xrange(len(input_paths)):
+      for i in range(len(input_paths)):
         path = "./telomerecat_length_%d_%d.csv" % (time.time(), i)
         output_paths.append(path)
 
@@ -270,7 +269,8 @@ class Csv2Length(core.TelomerecatInterface):
     counts.to_csv(count_path, index=None)
 
   def __copy_out_of_temp__(self, file_paths, copy_path="."):
-    map(lambda fil: copy(fil, copy_path), file_paths)
+    for fil in file_paths:
+      copy(fil, copy_path)
 
   def get_parser(self):
     parser = self.default_parser()
@@ -379,4 +379,4 @@ def run_simulator_par(insert_mu, insert_sigma, complete, boundary, proc, read_le
 
 
 if __name__ == "__main__":
-  print "Do not run this script directly. Type `telomerecat` for help."
+  print ("Do not run this script directly. Type `telomerecat` for help.")

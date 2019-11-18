@@ -1,14 +1,13 @@
-# __init__.py
-import core
+from . import core
 
-from telomerecat.csv2length import Csv2Length
-from telomerecat.bam2telbam import Bam2Telbam
-from telomerecat.telbam2length import Telbam2Length
-from telomerecat.bam2length import Bam2Length
+from .csv2length import Csv2Length
+from .bam2telbam import Bam2Telbam
+from .telbam2length import Telbam2Length
+from .bam2length import Bam2Length
 
-import bam2telbam
-import bam2length
-import telbam2length
-import csv2length
+from . import bam2telbam
+from . import bam2length
+from . import telbam2length
+from . import csv2length
 
-from _version import __version__
+from .version import __version__

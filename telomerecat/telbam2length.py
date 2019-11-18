@@ -13,7 +13,7 @@ import parabam
 import numpy as np
 import pandas as pd
 
-from itertools import izip
+# from itertools import izip
 from collections import namedtuple
 
 from telomerecat import Csv2Length
@@ -65,7 +65,7 @@ class SimpleReadFactory(object):
     for start, end in frameshift_loci:
       fuse_phreds = []
 
-      for i in xrange(start, end):
+      for i in range(start, end):
         if i in mima_loci:
           remove_mimas.append(i)
         fuse_phreds.append(ord(qual[i]) - self._phred_offset)
@@ -121,7 +121,7 @@ class SimpleReadFactory(object):
   def __flip_and_compliment__(self, read):
     if read.is_reverse:
       compliments = self._compliments
-      seq_compliment = map(lambda base: compliments[base], read.seq)
+      seq_compliment = [compliments[base] for base in read.seq]
       seq_compliment = "".join(seq_compliment)
       return (seq_compliment[::-1], read.qual[::-1])
     else:
@@ -259,12 +259,12 @@ class MismatchingLociLogic(object):
     comparisons = []
     best_score = float("inf")
 
-    for i in xrange(len(pattern)):
+    for i in range(len(pattern)):
       comparison_seq = self.telo_sequence_generator(pattern, i)
       mima_loci = []
       qual_bytes = []
       score = 0
-      for s, (l, c) in izip(seq, comparison_seq):
+      for s, (l, c) in zip(seq, comparison_seq):
         if s != c:
           mima_loci.append(l)
           qual_bytes.append(ord(qual[l]))
@@ -356,7 +356,7 @@ class MismatchingLociLogic(object):
       return
 
     def reverse_gen(seq, pattern):
-      for c, s in izip(seq[::-1], pattern[::-1]):
+      for c, s in zip(seq[::-1], pattern[::-1]):
         yield c, s
       return
 
@@ -368,20 +368,20 @@ class MismatchingLociLogic(object):
     return generator
 
   def print_mima(self, seq, qual, pat):
-    print "-"
+    print("-")
     loci_status, mima_loci, fuse_loci = self.get_loci_status(seq, qual, pat)
 
-    print "Mima:", mima_loci
-    print "Fuse:", fuse_loci
-    print seq
-    print loci_status
-    print qual
+    print("Mima: %s" % str(mima_loci))
+    print("Fuse: %s", str(fuse_loci))
+    print(seq)
+    print(loci_status)
+    print(qual)
 
   def get_loci_status(self, seq, qual, pat):
     mima_loci, fuse_loci = self.get_mismatching_loci(seq, qual, pat)
     loci_status = []
 
-    for i in xrange(len(seq)):
+    for i in range(len(seq)):
       if i in mima_loci:
         loci_status.append("X")
       else:
@@ -572,7 +572,7 @@ class ReadStatsFactory(object):
       thresh = np.percentile(hi_thresh, 95)
 
     if self._debug_print:
-      print "Thresh:", thresh
+      print("Thresh:", thresh)
 
     error_profile = (dif_counts * (dif_counts > 0)) > thresh
     error_profile = error_profile * 1
@@ -617,10 +617,10 @@ class ReadStatsFactory(object):
   def __transform_continous_matrix__(self, error_profile):
     continuous = np.zeros(error_profile.shape)
 
-    for row_i in xrange(0, error_profile.shape[0]):
+    for row_i in range(0, error_profile.shape[0]):
       sequence = 0
       start_index = -1
-      for col_i in xrange(0, error_profile.shape[1]):
+      for col_i in range(0, error_profile.shape[1]):
         value = error_profile[row_i, col_i]
         if value == 0:
           if sequence > 0:
@@ -636,12 +636,12 @@ class ReadStatsFactory(object):
   def __get_isolated_mask__(self, error_profile):
     isolated_mask = np.ones(error_profile.shape)
     first_locis = self.__get_first_loci__(error_profile)
-    for row_i in xrange(1, error_profile.shape[0]):
+    for row_i in range(1, error_profile.shape[0]):
       if first_locis[row_i] == -1:
         # skip rows with no entries
         continue
       else:
-        for col_i in xrange(error_profile.shape[1]):
+        for col_i in range(error_profile.shape[1]):
           if (not error_profile[row_i, col_i]) or col_i == 0:
             continue
           elif self.__prune_decision__(row_i, col_i, error_profile):
@@ -671,9 +671,9 @@ class ReadStatsFactory(object):
 
   def __get_first_loci__(self, error_profile):
     first_loci = []
-    for row_i in xrange(error_profile.shape[0]):
+    for row_i in range(error_profile.shape[0]):
       if any(error_profile[row_i, :]):
-        for col_i in xrange(error_profile.shape[1]):
+        for col_i in range(error_profile.shape[1]):
           if error_profile[row_i, col_i]:
             first_loci.append(col_i)
             break
@@ -685,7 +685,7 @@ class ReadStatsFactory(object):
     if error_profile.sum() > 0:
       start_row = np.where(error_profile)[0].max()
       global_loci = 0
-      for i in reversed(xrange(0, start_row + 1)):
+      for i in reversed(range(0, start_row + 1)):
         error_bins_in_row = np.where(error_profile[i, :])[0]
         if len(error_bins_in_row) > 0:
           cur_loci = error_bins_in_row.max()
@@ -739,9 +739,9 @@ class ReadStatsFactory(object):
     boundary_indicies = []
     complete_indicies = []
 
-    for i in xrange(int(read_array.shape[0])):
-      read_info = map(int, read_array[i, [0, -2]])
-      pair_info = map(int, read_array[i, [2, -1]])
+    for i in range(int(read_array.shape[0])):
+      read_info = list(map(int, read_array[i, [0, -2]]))
+      pair_info = list(map(int, read_array[i, [2, -1]]))
 
       read = error_profile[read_info[0], read_info[1]]
       pair = error_profile[pair_info[0], pair_info[1]]
@@ -896,7 +896,7 @@ class Telbam2Length(TelomerecatInterface):
       self.temp_dir, self.total_procs, self.task_size, trim
     )
 
-    for sample_path, sample_name, in izip(input_paths, names):
+    for sample_path, sample_name, in zip(input_paths, names):
       sample_intro = "\t- %s | %s\n" % (sample_name, self.__get_date_time__())
 
       self.__output__(sample_intro, 2)
@@ -1074,4 +1074,4 @@ class Telbam2Length(TelomerecatInterface):
 
 
 if __name__ == "__main__":
-  print "Do not run this script directly. Type `telomerecat` for help."
+  print("Do not run this script directly. Type `telomerecat` for help.")

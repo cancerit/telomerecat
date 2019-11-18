@@ -142,7 +142,7 @@ class Bam2Length(TelomerecatInterface):
 
 
 if __name__ == "__main__":
-  print "Please do not run this script directly." " Type telomerecat -h for more information."
+  print("Please do not run this script directly. Type telomerecat -h for more information.")
 
 
 # ....happily ever after.
