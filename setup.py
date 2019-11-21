@@ -14,7 +14,7 @@ setup(
   author_email="cgpit@sanger.ac.uk",
   packages=["telomerecat"],
   package_dir={"telomerecat": "telomerecat"},
-  install_requires=["parabam>=2.2", "argparse", "numpy", "pysam==0.10.0", "pandas"],
+  install_requires=["parabam>=2.2", "argparse", "numpy", "pysam", "pandas"],
   include_package_data=True,
   scripts=["./telomerecat/bin/telomerecat"],
   zip_safe=False,
