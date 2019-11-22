@@ -458,7 +458,8 @@ class VitalStatsFinder(object):
         stats["N"] = 1
 
       stats["read_len"] = len(read.seq)
-      byte_vals = map(ord, read.qual)
+      byte_vals = [ ord(char) for char in read.qual ]
+
       min_qual = min(byte_vals)
       max_qual = max(byte_vals)
 
