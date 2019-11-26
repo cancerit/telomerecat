@@ -880,9 +880,7 @@ class Telbam2Length(TelomerecatInterface):
     """
 
     self.__introduce__()
-
-    names = map(lambda b: os.path.basename(b), input_paths)
-    names = map(lambda nm: nm.replace("_telbam", ""), names)
+    names = [ os.path.basename(path).replace("_telbam", "") for path in input_paths ]
 
     output_csv_path = self.__get_output_path__(output_path)
     temp_csv_path = self.__get_temp_path__()
@@ -949,7 +947,7 @@ class Telbam2Length(TelomerecatInterface):
     self, inserts_path, insert_length_generator, vital_stats
   ):
     if inserts_path:
-      insert_mean, insert_sd = insert_length_generator.next()
+      insert_mean, insert_sd = insert_length_generator.__next__()
       vital_stats["insert_mean"] = insert_mean
       vital_stats["insert_sd"] = insert_sd
       self.__output__(
