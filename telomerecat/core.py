@@ -45,21 +45,8 @@ class TelomerecatInterface(parabam.core.Interface, metaclass=ABCMeta):
     parser = super(TelomerecatInterface, self).default_parser()
 
     parser.add_argument(
-      "--output",
-      metavar="CSV",
-      type=str,
-      nargs="?",
-      default=None,
-      help=(
-        "Specify output path for length estimation CSV.\n"
-        "Path automatically generated if no path is\n"
-        "specified [Default: None]"
-      ),
-    )
-    parser.add_argument(
       "--insert",
       metavar="CSV",
-      nargs="?",
       type=str,
       default=None,
       help=(

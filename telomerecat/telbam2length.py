@@ -16,9 +16,11 @@ import pandas as pd
 # from itertools import izip
 from collections import namedtuple
 
-from telomerecat import Csv2Length
+from telomerecat.csv2length import Csv2Length
 from telomerecat.core import TelomerecatInterface
 
+# import args
+from . import add_arg
 
 class SimpleReadFactory(object):
   def __init__(self, vital_stats=None, trim_reads=0):
@@ -882,7 +884,7 @@ class Telbam2Length(TelomerecatInterface):
     self.__introduce__()
     names = [ os.path.basename(path).replace("_telbam", "") for path in input_paths ]
 
-    output_csv_path = self.__get_output_path__(output_path)
+    output_csv_path = output_path
     temp_csv_path = self.__get_temp_path__()
 
     insert_length_generator = self.__get_insert_generator__(inserts_path)
@@ -980,15 +982,6 @@ class Telbam2Length(TelomerecatInterface):
     self.__create_output_file__(temp_path)
     return temp_path
 
-  def __get_output_path__(self, user_output_path):
-    tmct_output_path = None
-    if user_output_path is None:
-      tmct_output_path = os.path.join("./telomerecat_length_%d.csv" % (time.time(),))
-    else:
-      tmct_output_path = user_output_path
-
-    return tmct_output_path
-
   def __create_output_file__(self, output_csv_path):
     with open(output_csv_path, "w") as total:
       header = (
@@ -1036,38 +1029,8 @@ class Telbam2Length(TelomerecatInterface):
       % (self.instance_name, self.header_line, self.header_line,)
     )
 
-    parser.add_argument(
-      "input", metavar="TELBAM(S)", nargs="+", help="The TELBAM(s) that we wish to analyse"
-    )
-    parser.add_argument(
-      "--output",
-      metavar="CSV",
-      type=str,
-      nargs="?",
-      default=None,
-      help=(
-        "Specify output path for length estimation CSV.\n"
-        "Automatically generated if left blank [Default: None]"
-      ),
-    )
-    parser.add_argument(
-      "-s",
-      type=int,
-      nargs="?",
-      default=10000,
-      help=("The amount of reads considered by each\n" "distributed task. [Default: 10000]"),
-    )
-    parser.add_argument(
-      "-t",
-      "--trim",
-      type=int,
-      nargs="?",
-      default=0,
-      help="Use only the amount of sequence specified by this  \n"
-      "option (i.e if the value 90 is supplied\n"
-      "then only the first 90 bases are\n"
-      "considered) [Default: Whole read]",
-    )
+    for arg_name in ['input_telbam', 'output_csv', 'trim', 'nreads_for_task']:
+      add_arg[arg_name](parser)
 
     return parser
 

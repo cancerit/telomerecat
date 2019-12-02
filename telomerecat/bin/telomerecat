@@ -7,16 +7,21 @@ import multiprocessing
 
 # Do not remove these imports
 # Crucial for pyinstaller (as of v2.0)
-import telomerecat
+from telomerecat.bam2length import Bam2Length
+from telomerecat.bam2telbam import Bam2Telbam
+from telomerecat.telbam2length import Telbam2Length
+from telomerecat.csv2length import Csv2Length
+from telomerecat import __version__
+
 import parabam
 
 
 def handle_input():
   command_map = {
-    "bam2length": telomerecat.Bam2Length,
-    "bam2telbam": telomerecat.Bam2Telbam,
-    "telbam2length": telomerecat.Telbam2Length,
-    "csv2length": telomerecat.Csv2Length,
+    "bam2length": Bam2Length,
+    "bam2telbam": Bam2Telbam,
+    "telbam2length": Telbam2Length,
+    "csv2length": Csv2Length,
   }
 
   help_text = get_help_text()
@@ -69,7 +74,7 @@ def get_help_text():
       telbam2length   Estimate telomere length within TELBAMs
     """.expandtabs()
     )
-    % (telomerecat.__version__,)
+    % (__version__,)
   )
   return help_text
 

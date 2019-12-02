@@ -13,6 +13,8 @@ import gc
 
 import parabam
 
+from . import add_arg
+
 # Here we define what constitutes a telomereic read.
 # If both reads in a pair match the critea we store
 # them to the telbam
@@ -159,12 +161,8 @@ class Bam2Telbam(parabam.core.Interface):
       % (self.instance_name, self.header_line, self.header_line,)
     )
 
-    parser.add_argument(
-      "input",
-      metavar="BAM(S)",
-      nargs="+",
-      help="BAM file(s) for which we wish to generate TELBAMS",
-    )
+    for arg_name in ['input_bam', 'outbam_dir']:
+      add_arg[arg_name](parser)
 
     return parser
 

@@ -11,6 +11,8 @@ import textwrap
 
 from telomerecat.core import TelomerecatInterface
 
+# import args
+from . import add_arg
 
 class Bam2Length(TelomerecatInterface):
   def __init__(
@@ -36,11 +38,12 @@ class Bam2Length(TelomerecatInterface):
     )
 
   def run_cmd(self):
+    # TODO: existence of self.cmd_args.outbam_dir should be checked before proceeding
     self.run(
       input_paths=self.cmd_args.input,
       output_path=self.cmd_args.output,
       inserts_path=self.cmd_args.insert,
-      discard_telbams=self.cmd_args.discard_telbams,
+      discard_telbams=self.cmd_args.outbam_dir is None,
       correct_f2a=self.cmd_args.enable_correction,
       simulator_n=self.cmd_args.simulator_runs,
     )
@@ -56,8 +59,8 @@ class Bam2Length(TelomerecatInterface):
   ):
 
     # Import here to avoid infinite loop on import
-    from telomerecat import Bam2Telbam
-    from telomerecat import Telbam2Length
+    from telomerecat.bam2telbam import Bam2Telbam
+    from telomerecat.telbam2length import Telbam2Length
 
     self.__introduce__()
 
@@ -124,19 +127,8 @@ class Bam2Length(TelomerecatInterface):
       % (self.instance_name, self.header_line, self.header_line,)
     )
 
-    parser.add_argument(
-      "input",
-      metavar="BAM(S)",
-      nargs="+",
-      help=("BAM file(s) for which we wish to\n" "generate telomere length estimates"),
-    )
-    parser.add_argument(
-      "-x",
-      "--discard_telbams",
-      action="store_true",
-      default=False,
-      help=("The program will NOT save any TELBAMs\n" "generated as part of the analysis"),
-    )
+    for arg_name in ['input_bam', 'outbam_dir', 'output_csv', 'trim', 'nreads_for_task']:
+      add_arg[arg_name](parser)
 
     return parser
 
