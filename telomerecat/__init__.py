@@ -72,8 +72,8 @@ def add_nreads_for_each_task_arg(parser):
     "-s",
     type=int,
     metavar="INT",
-    default=10000,
-    help=("The amount of reads considered by each\n" "distributed task. [Default: 10000]"),
+    default=250000,
+    help=("The amount of reads considered by each\n" "distributed task. [Default: 250000]"),
   )
 
 add_arg = {
