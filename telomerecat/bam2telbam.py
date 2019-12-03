@@ -8,12 +8,13 @@ Author: jhrf
 """
 
 import sys
+import os
 import textwrap
 import gc
 
 import parabam
 
-from . import add_arg
+from . import add_arg, exit_with_msg
 
 # Here we define what constitutes a telomereic read.
 # If both reads in a pair match the critea we store
@@ -65,9 +66,10 @@ class Bam2Telbam(parabam.core.Interface):
     """Called from the master `telomerecat` script which handels the
     cmd line interface. Requires an argparse parser. Users should call
     the `run` function."""
-    self.run(input_paths=self.cmd_args.input)
 
-  def run(self, input_paths, keep_in_temp=False):
+    self.run(input_paths=self.cmd_args.input, outbam_dir=self.cmd_args.outbam_dir)
+
+  def run(self, input_paths, outbam_dir=None):
     """The main function for invoking the part of the 
        program which creates a telbam from a bam
 
@@ -90,6 +92,14 @@ class Bam2Telbam(parabam.core.Interface):
     telbam_constants = {"thresh": 1, "tel_pats": tel_pats}
 
     final_output_paths = {}
+
+    keep_in_temp = outbam_dir is None
+    if not keep_in_temp:
+      # check if the folder is writable
+      if not os.path.exists(outbam_dir):
+        exit_with_msg(f'Error: can not find outbam_dir path: \'{outbam_dir}\'.\n')
+      if not os.access(outbam_dir, os.W_OK | os.X_OK):
+        exit_with_msg(f'Error: do not have right permission to write into outbam_dir path: \'{outbam_dir}\'.\n')
 
     for input_path in input_paths:
 
@@ -115,6 +125,7 @@ class Bam2Telbam(parabam.core.Interface):
         subsets=subset_types,
         constants=telbam_constants,
         rule=rule,
+        outbam_dir=outbam_dir
       )
       if self.verbose:
         sys.stdout.write(

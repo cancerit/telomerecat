@@ -43,7 +43,7 @@ class Bam2Length(TelomerecatInterface):
       input_paths=self.cmd_args.input,
       output_path=self.cmd_args.output,
       inserts_path=self.cmd_args.insert,
-      discard_telbams=self.cmd_args.outbam_dir is None,
+      outbam_dir=self.cmd_args.outbam_dir,
       correct_f2a=self.cmd_args.enable_correction,
       simulator_n=self.cmd_args.simulator_runs,
     )
@@ -52,8 +52,8 @@ class Bam2Length(TelomerecatInterface):
     self,
     input_paths,
     output_path=None,
+    outbam_dir=None,
     inserts_path=None,
-    discard_telbams=False,
     correct_f2a=False,
     simulator_n=10,
   ):
@@ -73,7 +73,9 @@ class Bam2Length(TelomerecatInterface):
       announce=False,
     )
 
-    out_files = telbam_interface.run(input_paths=input_paths, keep_in_temp=discard_telbams)
+    out_files = telbam_interface.run(input_paths=input_paths, outbam_dir=outbam_dir)
+
+    print("telomerecat got these out files: %s" % out_files)
 
     length_paths = self.collapse_out_files(out_files)
     length_interface = Telbam2Length(

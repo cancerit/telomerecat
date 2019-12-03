@@ -1,15 +1,4 @@
-# from . import core
-
-# from .csv2length import Csv2Length
-# from .bam2telbam import Bam2Telbam
-# from .telbam2length import Telbam2Length
-# from .bam2length import Bam2Length
-
-# from . import bam2telbam
-# from . import bam2length
-# from . import telbam2length
-# from . import csv2length
-
+import sys
 from .version import __version__
 
 def add_input_telbam_arg(parser):
@@ -84,3 +73,8 @@ add_arg = {
   'output_csv': add_output_csv_arg,
   'nreads_for_task': add_nreads_for_each_task_arg
 }
+
+def exit_with_msg(message):
+  sys.stderr.write(message)
+  sys.stderr.flush()
+  sys.exit(1)
