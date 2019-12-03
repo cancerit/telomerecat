@@ -75,8 +75,6 @@ class Bam2Length(TelomerecatInterface):
 
     out_files = telbam_interface.run(input_paths=input_paths, outbam_dir=outbam_dir)
 
-    print("telomerecat got these out files: %s" % out_files)
-
     length_paths = self.collapse_out_files(out_files)
     length_interface = Telbam2Length(
       temp_dir=self.temp_dir,
