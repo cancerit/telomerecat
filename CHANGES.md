@@ -5,6 +5,7 @@
 * Codes are migrated to python3, and do not support python2 anymore.
 * added command line option `--temp_dir` to allow user to specify a folder for intermediate files.
 * added command line option `--outbam_dir` to allow user to specify a folder to save telBAMs to.
+* added Dockerfile
 
 2017/12/8 - Telomerecat v3.2 -jhrf
 
