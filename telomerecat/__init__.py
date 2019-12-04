@@ -38,7 +38,7 @@ def add_outbam_dir_arg(parser):
     default=None,
     help=(
       "Output folder for bams which have all reads with at least 2 occurences\n"
-      "of the telomeric hexamer. [Default: None, telbams will be discaded]"
+      "of the telomeric hexamer. [Default: None, telbams will be discarded]"
     ),
   )
 
