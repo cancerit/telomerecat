@@ -2,7 +2,7 @@ FROM ubuntu:18.04 as builder
 USER root
 
 # Version of tools that are going to be installed.
-# ENV PARABAM_VER '2.3.0'
+ENV PARABAM_VER '2.3.0'
 
 RUN apt-get -yq update
 RUN apt-get install -yq --no-install-recommends \
@@ -26,14 +26,7 @@ RUN update-locale LANG=en_US.UTF-8
 ENV LC_ALL en_US.UTF-8
 ENV LANG en_US.UTF-8
 
-# isntall parabam from source
-RUN git clone https://github.com/cancerit/parabam.git
-WORKDIR ./parabam
-RUN git checkout feature/to_py3
-RUN pip3 install cython
-RUN python3 setup.py sdist
-RUN pip3 install --install-option="--prefix=$CGP_OPT/python-lib" --ignore-installed dist/$(ls -1 dist/)
-WORKDIR ..
+RUN pip3 install --install-option="--prefix=$CGP_OPT/python-lib" https://github.com/cancerit/parabam/releases/download/${PARABAM_VER}/parabam-${PARABAM_VER}.tar.gz
 
 # build the tools in this repo, separate to reduce build time on errors
 COPY . .
