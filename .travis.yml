@@ -12,5 +12,6 @@ script:
  - echo 'Build and check docker image'
  - docker build -t telomerecat .
  - docker images | grep -c telomerecat
- - docker run -t --rm telomerecat telomerecat -h
  - docker run -t --rm telomerecat telomerecat bam2length -h
+ - docker run -t --rm telomerecat telomerecat bam2telbam -h
+ - docker run -t --rm telomerecat telomerecat telbam2length -h
