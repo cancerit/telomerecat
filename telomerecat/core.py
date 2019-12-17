@@ -7,6 +7,7 @@ Author: jhrf
 """
 
 import sys
+from argparse import SUPPRESS
 import parabam
 from abc import ABCMeta
 
@@ -77,6 +78,13 @@ class TelomerecatInterface(parabam.core.Interface, metaclass=ABCMeta):
       help="Correction will be applied to F2a values",
     )
 
+    parser.add_argument(
+      "--seed_randomness",
+      action="store_true",
+      default=False,
+      # Use the seed (42) for all randomnesses in telomerecat to produce stable results.
+      help=SUPPRESS  # this option is hidden from users.
+    )
     # TODO: Implement these additional parameters:
     #
     # parser.add_argument(

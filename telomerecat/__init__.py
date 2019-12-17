@@ -1,6 +1,9 @@
 import sys
 from .version import __version__
 
+# oh 42, the answer to everything.
+RANDOM_SEED = 42
+
 def add_input_telbam_arg(parser):
   parser.add_argument(
     "input", metavar="TELBAM(S)", nargs="+", help="The TELBAM(s) that we wish to analyse"

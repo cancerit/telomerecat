@@ -23,9 +23,10 @@ from multiprocessing import Pool, freeze_support
 
 from telomerecat import core
 
+from . import RANDOM_SEED
 
 class LengthSimulator(object):
-  def __init__(self, insert_mu, insert_sigma, complete, boundary, read_len=100):
+  def __init__(self, insert_mu, insert_sigma, complete, boundary, read_len, seed_randomness=False):
 
     self._insert_mu = insert_mu
     self._insert_sigma = insert_sigma
@@ -39,6 +40,7 @@ class LengthSimulator(object):
     self._read_sim = self.__simulate_reads__
 
     self._get_read_len = lambda: self._read_len
+    self.seed_randomness = seed_randomness
 
   def start(self):
     if self._boundary <= 0 or self._complete <= 0:
@@ -84,7 +86,8 @@ class LengthSimulator(object):
 
   def __get_factor__(self, abs_result):
     total = self._obs_total
-
+    if self.seed_randomness:
+      random.seed(RANDOM_SEED)
     if abs_result < (total * 0.001):
       factor = 1
     elif abs_result < (total * 0.2):
@@ -122,7 +125,11 @@ class LengthSimulator(object):
     total = 0
 
     while total < (obs_total):
+      if self.seed_randomness:
+        random.seed(RANDOM_SEED)
       insert_size = random.gauss(insert_mean, insert_sigma)
+      if self.seed_randomness:
+        random.seed(RANDOM_SEED)
       location = random.randint(0, tel_len)
       if is_complete(location, insert_size):
         est_complete += 1
@@ -162,10 +169,11 @@ class Csv2Length(core.TelomerecatInterface):
       correct_f2a=not self.cmd_args.disable_correction,
       output_paths=output_paths,
       prior_weight=self.cmd_args.prior_weight,
-      simulator_n=self.cmd_args.simulator_runs,
+      seed_randomness=self.cmd_args.seed_randomness,
+      simulator_n=self.cmd_args.simulator_runs
     )
 
-  def run(self, input_paths, output_paths=[], correct_f2a=True, prior_weight=3, simulator_n=10):
+  def run(self, input_paths, output_paths=[], correct_f2a=True, prior_weight=3, seed_randomness=False, simulator_n=10):
 
     self.__introduce__()
     self.__generate_output_paths__(input_paths, output_paths)
@@ -179,7 +187,7 @@ class Csv2Length(core.TelomerecatInterface):
 
       counts = pd.read_csv(input_path)
       counts = self.__get_length_from_dataframe__(
-        counts, simulator_n, correct_f2a, prior_weight
+        counts, simulator_n, correct_f2a, prior_weight, seed_randomness
       )
 
       self.__output_length_results__(counts, output_path)
@@ -199,7 +207,7 @@ class Csv2Length(core.TelomerecatInterface):
     return output_paths
 
   def __get_length_from_dataframe__(
-    self, counts, simulator_n, correct_f2a=True, prior_weight=3, simulate_lengths=True,
+    self, counts, simulator_n, correct_f2a=True, prior_weight=3, seed_randomness=False, simulate_lengths=True,
   ):
 
     counts["F2a"] = counts["F2"] - counts["F4"]
@@ -210,7 +218,7 @@ class Csv2Length(core.TelomerecatInterface):
       counts["F2a_c"] = counts["F2a"]
 
     if simulate_lengths:
-      counts["Length"] = self.__get_lengths__(counts, simulator_n)
+      counts["Length"] = self.__get_lengths__(counts, seed_randomness, simulator_n)
     else:
       counts["Length"] = self.__quick_length__(counts)
 
@@ -240,7 +248,7 @@ class Csv2Length(core.TelomerecatInterface):
       lengths.append(round(length, 3))
     return lengths
 
-  def __get_lengths__(self, counts, simulator_n):
+  def __get_lengths__(self, counts, seed_randomness, simulator_n):
     lengths = []
     for i, sample in counts.iterrows():
       sample_intro = "\t- %s | %s\n" % (sample["Sample"], self.__get_date_time__())
@@ -253,7 +261,8 @@ class Csv2Length(core.TelomerecatInterface):
         sample["F2a_c"],
         self.total_procs,
         sample["Read_length"],
-        simulator_n,
+        seed_randomness,
+        simulator_n
       )
 
       lengths.append(length_mean)
@@ -352,14 +361,14 @@ def run_simulator(insert_mu, insert_sigma, complete, boundary, proc, read_len, n
   return (np.mean(res), np.std(res))
 
 
-def estimator_process(job, insert_mu, insert_sigma, complete, boundary, read_len):
+def estimator_process(job, insert_mu, insert_sigma, complete, boundary, read_len, seed_randomness):
 
-  length_estimator = LengthSimulator(insert_mu, insert_sigma, complete, boundary, read_len)
+  length_estimator = LengthSimulator(insert_mu, insert_sigma, complete, boundary, read_len, seed_randomness)
   results = length_estimator.start()
   return results
 
 
-def run_simulator_par(insert_mu, insert_sigma, complete, boundary, proc, read_len, simulator_n):
+def run_simulator_par(insert_mu, insert_sigma, complete, boundary, proc, read_len, seed_randomness, simulator_n):
 
   freeze_support()
   p = Pool(proc)
@@ -370,6 +379,7 @@ def run_simulator_par(insert_mu, insert_sigma, complete, boundary, proc, read_le
     complete=complete,
     boundary=boundary,
     read_len=read_len,
+    seed_randomness=seed_randomness
   )
 
   results = p.map(sim_partial, range(simulator_n))

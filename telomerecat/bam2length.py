@@ -46,6 +46,7 @@ class Bam2Length(TelomerecatInterface):
       outbam_dir=self.cmd_args.outbam_dir,
       correct_f2a=self.cmd_args.enable_correction,
       simulator_n=self.cmd_args.simulator_runs,
+      seed_randomness=self.cmd_args.seed_randomness
     )
 
   def run(
@@ -56,6 +57,7 @@ class Bam2Length(TelomerecatInterface):
     inserts_path=None,
     correct_f2a=False,
     simulator_n=10,
+    seed_randomness=False
   ):
 
     # Import here to avoid infinite loop on import
@@ -91,6 +93,7 @@ class Bam2Length(TelomerecatInterface):
       inserts_path=inserts_path,
       simulator_n=simulator_n,
       correct_f2a=correct_f2a,
+      seed_randomness=seed_randomness
     )
 
     self.__goodbye__()

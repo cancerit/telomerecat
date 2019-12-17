@@ -11,6 +11,7 @@ import re
 import parabam
 
 import numpy as np
+import random
 import pandas as pd
 
 # from itertools import izip
@@ -21,6 +22,9 @@ from telomerecat.core import TelomerecatInterface
 
 # import args
 from . import add_arg
+from functools import partial
+
+from . import RANDOM_SEED
 
 class SimpleReadFactory(object):
   def __init__(self, vital_stats=None, trim_reads=0):
@@ -504,7 +508,7 @@ class VitalStatsFinder(object):
 
 
 class ReadStatsFactory(object):
-  def __init__(self, temp_dir, total_procs=4, task_size=5000, trim_reads=0, debug_print=False):
+  def __init__(self, temp_dir, total_procs=4, task_size=5000, trim_reads=0, seed_randomness=False, debug_print=False):
 
     self.temp_dir = temp_dir
     self._total_procs = total_procs
@@ -512,6 +516,7 @@ class ReadStatsFactory(object):
 
     self._debug_print = debug_print
     self._trim = trim_reads
+    self.seed_randomness = seed_randomness
 
   def get_read_counts(self, path, vital_stats):
     read_stat_paths = self.run_read_stat_rule(path, vital_stats)
@@ -777,7 +782,7 @@ class ReadStatsFactory(object):
 
       return return_stats
 
-    def rule(reads, constants, master):
+    def rule(reads, constants, master, seed_randomness):
       simple_reads = [simple_read_factory.get_simple_read(read) for read in reads]
       return_dat = np.zeros((2, 6))
       return_dat[0, :] = get_return_stats(simple_reads)
@@ -791,7 +796,9 @@ class ReadStatsFactory(object):
 
         sample_size = len(read.mima_loci)
         if sample_size > 0:
-          rand_quals = np.random.choice(list(read.qual), sample_size)
+          if seed_randomness:
+            random.seed(RANDOM_SEED)
+          rand_quals = random.sample(list(read.qual), sample_size)
           qual_bytes = [ord(q) - phred_offset for q in rand_quals]
           rand_avg = np.mean(qual_bytes)
 
@@ -821,7 +828,7 @@ class ReadStatsFactory(object):
     )
 
     out_paths = stat_interface.run(
-      input_paths=[path], constants={}, rule=rule, struc_blueprint=structures
+      input_paths=[path], constants={}, rule=partial(rule, seed_randomness=self.seed_randomness), struc_blueprint=structures
     )
 
     return out_paths[path]
@@ -858,6 +865,7 @@ class Telbam2Length(TelomerecatInterface):
       simulator_n=self.cmd_args.simulator_runs,
       correct_f2a=self.cmd_args.enable_correction,
       inserts_path=self.cmd_args.insert,
+      seed_randomness=self.cmd_args.seed_randomness
     )
 
   def run(
@@ -868,6 +876,7 @@ class Telbam2Length(TelomerecatInterface):
     correct_f2a=False,
     simulator_n=10,
     inserts_path=None,
+    seed_randomness=False
   ):
 
     """The main function for invoking the part of the
@@ -909,7 +918,7 @@ class Telbam2Length(TelomerecatInterface):
       )
 
       read_type_counts = self.__get_read_types__(
-        sample_path, vital_stats, self.total_procs, trim
+        sample_path, vital_stats, self.total_procs, trim, seed_randomness
       )
 
       self.__write_to_csv__(read_type_counts, vital_stats, temp_csv_path, sample_name)
@@ -927,7 +936,8 @@ class Telbam2Length(TelomerecatInterface):
       input_paths=[temp_csv_path],
       output_paths=[output_csv_path],
       correct_f2a=correct_f2a,
-      simulator_n=simulator_n,
+      seed_randomness=seed_randomness,
+      simulator_n=simulator_n
     )
 
     self.__print_output_information__(output_csv_path)
@@ -966,12 +976,12 @@ class Telbam2Length(TelomerecatInterface):
       )
 
   def __get_read_types__(
-    self, sample_path, vital_stats, total_procs, trim, read_stats_factory=None
+    self, sample_path, vital_stats, total_procs, trim, seed_randomness, read_stats_factory=None
   ):
 
     if read_stats_factory is None:
       read_stats_factory = ReadStatsFactory(
-        temp_dir=self.temp_dir, total_procs=total_procs, trim_reads=trim, debug_print=False
+        temp_dir=self.temp_dir, total_procs=total_procs, trim_reads=trim, seed_randomness=seed_randomness, debug_print=False
       )
 
     read_type_counts = read_stats_factory.get_read_counts(sample_path, vital_stats)
