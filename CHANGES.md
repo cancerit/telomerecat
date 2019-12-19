@@ -1,8 +1,8 @@
 # CHANGES
 
-# next
+# 3.3.0
 
-* Codes are migrated to python3, and do not support python2 anymore.
+* Code are migrated to python3, and does not support python2 anymore.
 * added command line option `--temp_dir` to allow user to specify a folder for intermediate files.
 * added command line option `--outbam_dir` to allow user to specify a folder to save telBAMs to.
 * added Dockerfile
