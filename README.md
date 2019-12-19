@@ -31,9 +31,9 @@ pip install https://github.com/cancerit/telomerecat/archive/3.3.0.tar.gz
 * [pysam](https://www.scipy.org/)
 * [pandas](https://pandas.pydata.org/)
 
-### Development Dependencies
+## Development Dependencies
 
-#### Setup VirtualEnv
+### Setup VirtualEnv
 
 ```bash
 cd $PROJECTROOT
