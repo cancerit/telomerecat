@@ -1,5 +1,2 @@
-We reccomend installing using pip as follows:
-
-    pip install telomerecat
-
-Otherwise please see telomerecat.rtfd.io for more information
+Installation is via pip. Simply execute with the URL to a release, e.g.:
+pip install https://github.com/cancerit/telomerecat/archive/3.3.0.tar.gz

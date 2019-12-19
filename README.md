@@ -21,9 +21,7 @@ Telomerecat is available as a Docker container on [Quay.io][quay-repo].
 Installation is via `pip`.  Simply execute with the path to the packaged distribution:
 
 ```bash
-pip install --find-links=~/wheels telomerecat
-# or
-pip install https://github.com/cancerit/telomerecat/archive/master.tar.gz
+pip install https://github.com/cancerit/telomerecat/archive/3.3.0.tar.gz
 ```
 
 ### Package Dependancies
