@@ -1,3 +1,13 @@
+# CHANGES
+
+# 3.3.0
+
+* Code are migrated to python3, and does not support python2 anymore.
+* added command line option `--temp_dir` to allow user to specify a folder for intermediate files.
+* added command line option `--outbam_dir` to allow user to specify a folder to save telBAMs to.
+* added Dockerfile
+* added hidden command line option `--seed_randomness` to produce stable output, but it runs very slow and in risk of voilating telomerecat's original design. ***Not*** recommand to use other than validating outputs between code changes.
+
 2017/12/8 - Telomerecat v3.2 -jhrf
 
 - Fixed a bug in the command line interface where the specificed number
