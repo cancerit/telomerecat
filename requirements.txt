@@ -1,0 +1,4 @@
+numpy==1.17.4
+pandas==0.25.3
+parabam>=2.3.0
+pysam==0.15.3
