@@ -26,6 +26,8 @@ RUN update-locale LANG=en_US.UTF-8
 ENV LC_ALL en_US.UTF-8
 ENV LANG en_US.UTF-8
 
+RUN pip3 install wheel cython
+
 RUN pip3 install --install-option="--prefix=$CGP_OPT/python-lib" https://github.com/cancerit/parabam/releases/download/${PARABAM_VER}/parabam-${PARABAM_VER}.tar.gz
 
 # build the tools in this repo, separate to reduce build time on errors
