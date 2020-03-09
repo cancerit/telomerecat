@@ -12,6 +12,7 @@ import sys
 import textwrap
 import time
 import random
+import math
 
 import numpy as np
 import pandas as pd
@@ -130,7 +131,7 @@ class LengthSimulator(object):
       insert_size = random.gauss(insert_mean, insert_sigma)
       if self.seed_randomness:
         random.seed(RANDOM_SEED)
-      location = random.randint(0, tel_len)
+      location = random.randint(0, int(math.floor(tel_len)))
       if is_complete(location, insert_size):
         est_complete += 1
         total += 1

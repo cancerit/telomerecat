@@ -1,5 +1,10 @@
 # CHANGES
 
+# 3.4.0
+
+* Fixed float being passed to randint function.
+* Now installs cython as CI was breaking.
+
 # 3.3.0
 
 * Code are migrated to python3, and does not support python2 anymore.
