@@ -1,2 +1,2 @@
 Installation is via pip. Simply execute with the URL to a release, e.g.:
-pip install https://github.com/cancerit/telomerecat/archive/3.3.0.tar.gz
+pip install https://github.com/cancerit/telomerecat/archive/3.4.0.tar.gz
