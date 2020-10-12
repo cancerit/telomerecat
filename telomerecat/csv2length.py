@@ -287,7 +287,7 @@ class Csv2Length(core.TelomerecatInterface):
 
       length_means.append(length_mean)
       length_stds.append(length_std)
-  return length_means, length_stds
+    return length_means, length_stds
 
   def __generate_output_paths__(self, input_paths, output_paths):
     if len(output_paths) < len(input_paths):
