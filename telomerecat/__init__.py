@@ -68,13 +68,76 @@ def add_nreads_for_each_task_arg(parser):
     help=("The amount of reads considered by each\n" "distributed task. [Default: 250000]"),
   )
 
+
+def add_file_input_arg(parser):
+  parser.add_argument(
+    '-i', '--file_input',
+    action="store_true",
+    default=False,
+    help="Specify whether the input file is a telbam or a txt file\n"
+          "that contains one telbam file per row. If the -cnt flag is\n"
+          "also used then the input txt file also contains coverage\n"
+          "and number of chromosomes on each row (separated by comma)."
+  )
+
+
+def add_pseudobulk_arg(parser):
+  parser.add_argument(
+    '-b', '--pseudobulk',
+    metavar='TELBAM',
+    type=str,
+    nargs='?',
+    default=None,
+    help="Path to pseudobulk telbam that gets used to create a bulk error\n"
+          "profile and sample variance that is used to categorize\n"
+          "read types for all cells. A telomere length estimate will\n"
+          "be given for this pseudobulk telbam too. [Default: None]"
+  )
+
+
+def add_error_path_arg(parser):
+  parser.add_argument(
+    '-ep', '--error_path',
+    type=str,
+    nargs='?',
+    default=None,
+    help="Specify a path to save error_profile arrays to.\n"
+          "[Default: None]"
+  )
+
+
+def add_error_list_arg(parser):
+  parser.add_argument(
+    '-el', '--error_list',
+    action="store_true",
+    default=False,
+    help="Specify whether the non-global error profiles should be\n"
+          "recorded in a list. [Default: None]"
+  )
+
+
+def add_cov_ntel_arg(parser):
+  parser.add_argument(
+    '-cnt', '--cov_ntel',
+    action="store_true",
+    default=False,
+    help="Use this option when input txt file also has coverage and number\n"
+          "of telomeres. Telomere length will be calculated using F1, F2a_c, coverage,\n"
+          "and number of telomeres in this case."
+  )
+
 add_arg = {
   'input_telbam': add_input_telbam_arg,
   'input_bam': add_input_bam_arg,
   'trim': add_trim_arg,
   'outbam_dir': add_outbam_dir_arg,
   'output_csv': add_output_csv_arg,
-  'nreads_for_task': add_nreads_for_each_task_arg
+  'nreads_for_task': add_nreads_for_each_task_arg,
+  'file_input': add_file_input_arg,
+  'pseudobulk': add_pseudobulk_arg,
+  'error_path': add_error_path_arg,
+  'error_list': add_error_list_arg,
+  'cov_ntel': add_cov_ntel_arg
 }
 
 def exit_with_msg(message):

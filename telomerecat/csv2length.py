@@ -218,19 +218,24 @@ class Csv2Length(core.TelomerecatInterface):
     else:
       counts["F2a_c"] = counts["F2a"]
 
-    if simulate_lengths:
-      counts["Length"] = self.__get_lengths__(counts, seed_randomness, simulator_n)
+    if "coverage" in counts.columns and "num_tel" in counts.columns:
+      lengths = self.__get_cov_ntel_lengths__(counts)
+      counts["Length"] = lengths
+      counts["Length_std"] = [0.000] * len(lengths)  # stdev is always 0 with cov_ntel_lengths
+    elif simulate_lengths:
+      counts["Length"], counts["Length_std"] = self.__get_lengths__(counts, simulator_n)
     else:
-      counts["Length"] = self.__quick_length__(counts)
-
+      lengths = self.__quick_length__(counts)
+      counts["Length"] = lengths
+      counts["Length_std"] = [0.000] * len(lengths)  # stdev is always 0 with quick_length
     return counts
 
   def __get_corrected_f2a__(self, counts, prior_weight=3):
 
-    theta_observed = counts["F2a"] / (counts["F2"] + counts["F4"])
+    theta_observed = counts["F2a"] / (counts["F2"] + counts["F4"] + np.finfo(float).eps)  # include very small float eps so that 0/0 = NaN turns into 0/eps = 0
 
     prior_weight = 3
-    theta_expected = sum(theta_observed * counts["F2"]) / sum(counts["F2"])
+    theta_expected = sum(theta_observed * counts["F2"]) / (sum(counts["F2"]) + np.finfo(float).eps)
 
     theta_corrected = (
       (theta_observed * (counts["Psi"])) + (theta_expected * prior_weight)
@@ -239,6 +244,14 @@ class Csv2Length(core.TelomerecatInterface):
     corrected_f2_counts = (counts["F2"] + counts["F4"]) * theta_corrected
 
     return corrected_f2_counts.round(3)
+
+  def __get_cov_ntel_lengths__(self, counts):
+    """ Calculate telomere length based on coverage, number of telomere, and read counts. """
+    lengths = []
+    for i, sample in counts.iterrows():
+      length = ((sample["F1"] * 2 + sample["F2a_c"]) * sample["Read_length"]) / (sample["coverage"] * sample["num_tel"])
+      lengths.append(round(length, 3))
+    return lengths
 
   def __quick_length__(self, counts):
     lengths = []
@@ -250,24 +263,31 @@ class Csv2Length(core.TelomerecatInterface):
     return lengths
 
   def __get_lengths__(self, counts, seed_randomness, simulator_n):
-    lengths = []
+    length_means = []
+    length_stds = []
     for i, sample in counts.iterrows():
       sample_intro = "\t- %s | %s\n" % (sample["Sample"], self.__get_date_time__())
       self.__output__(sample_intro, 2)
 
-      length_mean, len_std = run_simulator_par(
-        sample["Insert_mean"],
-        sample["Insert_sd"],
-        sample["F1"],
-        sample["F2a_c"],
-        self.total_procs,
-        sample["Read_length"],
-        seed_randomness,
-        simulator_n
-      )
+      # just say length is NA for cases that cause errors
+      # TODO: reconsider filtering out cases where F1=0 and F2a_c=0 too
+      if sample["Insert_sd"] <= 0 \
+      or np.isnan(sample["F2a_c"]):
+        length_mean = "NA"
+        length_std = "NA"
+      else:
+        length_mean, length_std = run_simulator_par(
+              sample["Insert_mean"],
+              sample["Insert_sd"],
+              sample["F1"],
+              sample["F2a_c"],
+              self.total_procs,
+              sample["Read_length"],
+              simulator_n)
 
-      lengths.append(length_mean)
-    return lengths
+      length_means.append(length_mean)
+      length_stds.append(length_std)
+  return length_means, length_stds
 
   def __generate_output_paths__(self, input_paths, output_paths):
     if len(output_paths) < len(input_paths):
