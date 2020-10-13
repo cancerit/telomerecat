@@ -223,7 +223,7 @@ class Csv2Length(core.TelomerecatInterface):
       counts["Length"] = lengths
       counts["Length_std"] = [0.000] * len(lengths)  # stdev is always 0 with cov_ntel_lengths
     elif simulate_lengths:
-      counts["Length"], counts["Length_std"] = self.__get_lengths__(counts, simulator_n)
+      counts["Length"], counts["Length_std"] = self.__get_lengths__(counts, seed_randomness, simulator_n)
     else:
       lengths = self.__quick_length__(counts)
       counts["Length"] = lengths

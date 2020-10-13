@@ -537,8 +537,8 @@ class ReadStatsFactory(object):
         else:
           self.__save_error_profile__(error_profile, error_path)
 
-        # always build vairance
-        sample_variance = self.__paths_to_sample_variance__(read_stat_paths)
+    # always build vairance
+    sample_variance = self.__paths_to_sample_variance__(read_stat_paths)
 
     read_counts = self.read_array_to_counts(read_array, error_profile, sample_variance)
 
@@ -919,7 +919,7 @@ class Telbam2Length(TelomerecatInterface):
         coverages = []
         num_tels = []
         for file in self.cmd_args.input:
-          with open(file, 'rb') as f:
+          with open(file, 'r') as f:
             for line in f:
               items = line.split(",")
               telbams_paths.append(items[0])
@@ -928,7 +928,7 @@ class Telbam2Length(TelomerecatInterface):
       else:  # txt file input just has telbam paths
         telbams_paths = []
         for file in self.cmd_args.input:
-          with open(file, 'rb') as f:
+          with open(file, 'r') as f:
             lines = [line.strip() for line in f]
             telbams_paths.extend(lines)
 

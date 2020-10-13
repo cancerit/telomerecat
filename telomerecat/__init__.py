@@ -98,6 +98,7 @@ def add_pseudobulk_arg(parser):
 def add_error_path_arg(parser):
   parser.add_argument(
     '-ep', '--error_path',
+    metavar='PATH',
     type=str,
     nargs='?',
     default=None,
