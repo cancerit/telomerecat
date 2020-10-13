@@ -283,6 +283,7 @@ class Csv2Length(core.TelomerecatInterface):
               sample["F2a_c"],
               self.total_procs,
               sample["Read_length"],
+              seed_randomness,
               simulator_n)
 
       length_means.append(length_mean)
