@@ -935,10 +935,6 @@ class Telbam2Length(TelomerecatInterface):
     else:  # input is already a list of telbam paths
       telbams_paths = self.cmd_args.input
 
-    # TODO: reconsider adding pseudobulk back into list here
-    # if self.cmd_args.pseudobulk is not None:
-    #     telbams_paths.append(self.cmd_args.pseudobulk)
-
     self.run(input_paths=telbams_paths,
             trim=self.cmd_args.trim,
             output_path=self.cmd_args.output,

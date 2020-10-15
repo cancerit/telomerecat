@@ -247,6 +247,7 @@ class Csv2Length(core.TelomerecatInterface):
 
   def __get_cov_ntel_lengths__(self, counts):
     """ Calculate telomere length based on coverage, number of telomere, and read counts. """
+    # TODO: estimate length uncertainty for each sample (row) based on missingness of coverage, return these uncertainties as length_stds
     lengths = []
     for i, sample in counts.iterrows():
       length = ((sample["F1"] * 2 + sample["F2a_c"]) * sample["Read_length"]) / (sample["coverage"] * sample["num_tel"])
@@ -270,9 +271,7 @@ class Csv2Length(core.TelomerecatInterface):
       self.__output__(sample_intro, 2)
 
       # just say length is NA for cases that cause errors
-      # TODO: reconsider filtering out cases where F1=0 and F2a_c=0 too
-      if sample["Insert_sd"] <= 0 \
-      or np.isnan(sample["F2a_c"]):
+      if sample["Insert_sd"] <= 0 or np.isnan(sample["F2a_c"]):
         length_mean = "NA"
         length_std = "NA"
       else:

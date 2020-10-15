@@ -90,8 +90,8 @@ def add_pseudobulk_arg(parser):
     default=None,
     help="Path to pseudobulk telbam that gets used to create a bulk error\n"
           "profile and sample variance that is used to categorize\n"
-          "read types for all cells. A telomere length estimate will\n"
-          "be given for this pseudobulk telbam too. [Default: None]"
+          "read types for all cells. A telomere length estimate won't\n"
+          "be given for this pseudobulk telbam. [Default: None]"
   )
 
 
