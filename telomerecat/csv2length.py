@@ -231,8 +231,8 @@ class Csv2Length(core.TelomerecatInterface):
     return counts
 
   def __get_corrected_f2a__(self, counts, prior_weight=3):
-
-    theta_observed = counts["F2a"] / (counts["F2"] + counts["F4"] + np.finfo(float).eps)  # include very small float eps so that 0/0 = NaN turns into 0/eps = 0
+    # include very small float eps so that 0/0 = NaN turns into 0/eps = 0
+    theta_observed = counts["F2a"] / (counts["F2"] + counts["F4"] + np.finfo(float).eps)
 
     prior_weight = 3
     theta_expected = sum(theta_observed * counts["F2"]) / (sum(counts["F2"]) + np.finfo(float).eps)
@@ -247,10 +247,12 @@ class Csv2Length(core.TelomerecatInterface):
 
   def __get_cov_ntel_lengths__(self, counts):
     """ Calculate telomere length based on coverage, number of telomere, and read counts. """
-    # TODO: estimate length uncertainty for each sample (row) based on missingness of coverage, return these uncertainties as length_stds
+    # TODO: estimate length uncertainty for each sample (row) based on 
+    # missingness of coverage, return these uncertainties as length_stds
     lengths = []
     for i, sample in counts.iterrows():
-      length = ((sample["F1"] * 2 + sample["F2a_c"]) * sample["Read_length"]) / (sample["coverage"] * sample["num_tel"])
+      length = ((sample["F1"] * 2 + sample["F2a_c"]) * sample["Read_length"]) / \
+          (sample["coverage"] * sample["num_tel"])
       lengths.append(round(length, 3))
     return lengths
 

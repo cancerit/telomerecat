@@ -528,12 +528,14 @@ class ReadStatsFactory(object):
       error_profile = self.__paths_to_error_profile__(read_stat_paths)
       # save error profile if error_path is specified
       if error_path is not None:
-        if error_list:  # use list format if more than one error profile needs to be saved
+        if error_list:
+          # use list format if more than one error profile needs to be saved
           temp_error_path = os.path.dirname(error_path) + "/" + str(sample_name)
           temp_error_path = temp_error_path.replace(".bam", "_error_profile.txt")
           self.__save_error_profile__(error_profile, temp_error_path)
           with open(error_path, "a") as f:
-            f.write(str(os.path.basename(temp_error_path)) + '\n')  # add error path name to list txt file
+            # add error path name to list txt file
+            f.write(str(os.path.basename(temp_error_path)) + '\n')
         else:
           self.__save_error_profile__(error_profile, error_path)
 
@@ -553,10 +555,9 @@ class ReadStatsFactory(object):
 
     # save error profile if error_path is specified
     if error_path is not None:
-      # error_path = error_path.replace(".bam", "_error_profile")
       self.__save_error_profile__(error_profile, error_path)
 
-    self.__delete_analysis_paths__(read_stat_paths)  # not sure if I need this line
+    self.__delete_analysis_paths__(read_stat_paths)
 
     return error_profile
 
@@ -979,7 +980,8 @@ class Telbam2Length(TelomerecatInterface):
       bulk_path (string): A path to a specified pseudobulk telbam (optional)
       error_path (string): A directory path used to store error profiles as CSVs (optional)
       error_list (bool): Denote whether to store non-global error profiles to a list (optional)
-      cov_ntel (bool): Denote whether coverages and num_tels have been provided within the input_paths txt file (optional)
+      cov_ntel (bool): Denote whether coverages and num_tels have been provided 
+                    within the input_paths txt file (optional)
       coverages (list): Coverages extracted from the original input_paths txt file
       num_tels (list): Number of telomeres per sample extracted from the original input_paths txt file
     """
@@ -1043,7 +1045,9 @@ class Telbam2Length(TelomerecatInterface):
         current_error_path = None
 
       read_type_counts = self.__get_read_types__(
-        sample_path, vital_stats, self.total_procs, trim, seed_randomness, names[i], error_profile=global_error_profile, error_path=current_error_path, error_list=error_list
+        sample_path, vital_stats, self.total_procs, trim, \
+        seed_randomness, names[i], error_profile=global_error_profile, \
+        error_path=current_error_path, error_list=error_list
       )
 
       # only include coverages and num_tels if they are non-empty lists
@@ -1113,15 +1117,22 @@ class Telbam2Length(TelomerecatInterface):
       )
 
   def __get_read_types__(
-    self, sample_path, vital_stats, total_procs, trim, seed_randomness, sample_name, read_stats_factory=None, error_profile=None, error_path=None, error_list=False
+    self, sample_path, vital_stats, total_procs, trim, seed_randomness, sample_name,
+    read_stats_factory=None, error_profile=None, error_path=None, error_list=False
   ):
 
     if read_stats_factory is None:
       read_stats_factory = ReadStatsFactory(
-        temp_dir=self.temp_dir, total_procs=total_procs, trim_reads=trim, seed_randomness=seed_randomness, debug_print=False
+        temp_dir=self.temp_dir, total_procs=total_procs, trim_reads=trim,
+        seed_randomness=seed_randomness, debug_print=False
       )
 
-    read_type_counts = read_stats_factory.get_read_counts(sample_path, vital_stats, sample_name=sample_name, error_profile=error_profile, error_path=error_path, error_list=error_list)
+    read_type_counts = read_stats_factory.get_read_counts(sample_path,
+                                                          vital_stats,
+                                                          sample_name=sample_name,
+                                                          error_profile=error_profile,
+                                                          error_path=error_path,
+                                                          error_list=error_list)
     return read_type_counts
 
   def __get_global_error__(self, sample_path,
@@ -1210,7 +1221,17 @@ class Telbam2Length(TelomerecatInterface):
       % (self.instance_name, self.header_line, self.header_line,)
     )
 
-    for arg_name in ['input_telbam', 'output_csv', 'trim', 'nreads_for_task', 'file_input', 'pseudobulk', 'error_path', 'error_list', 'cov_ntel']:
+    arg_list = ['input_telbam',
+                'output_csv',
+                'trim',
+                'nreads_for_task',
+                'file_input',
+                'pseudobulk',
+                'error_path',
+                'error_list',
+                'cov_ntel']
+
+    for arg_name in arg_list:
       add_arg[arg_name](parser)
 
     return parser
