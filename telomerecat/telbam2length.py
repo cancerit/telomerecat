@@ -518,18 +518,48 @@ class ReadStatsFactory(object):
     self._trim = trim_reads
     self.seed_randomness = seed_randomness
 
-  def get_read_counts(self, path, vital_stats):
+  def get_read_counts(self, path, vital_stats, sample_name=None, error_profile=None, error_path=None, error_list=False):
     read_stat_paths = self.run_read_stat_rule(path, vital_stats)
 
     read_array = self.__path_to_read_array__(read_stat_paths["read_array"])
 
-    error_profile, sample_variance = self.__paths_to_error_profile__(read_stat_paths)
+    # only build error profile if global error isn't passed into this function
+    if error_profile is None:
+      error_profile = self.__paths_to_error_profile__(read_stat_paths)
+      # save error profile if error_path is specified
+      if error_path is not None:
+        if error_list:
+          # use list format if more than one error profile needs to be saved
+          temp_error_path = os.path.dirname(error_path) + "/" + str(sample_name)
+          temp_error_path = temp_error_path.replace(".bam", "_error_profile.txt")
+          self.__save_error_profile__(error_profile, temp_error_path)
+          with open(error_path, "a") as f:
+            # add error path name to list txt file
+            f.write(str(os.path.basename(temp_error_path)) + '\n')
+        else:
+          self.__save_error_profile__(error_profile, error_path)
+
+    # always build vairance
+    sample_variance = self.__paths_to_sample_variance__(read_stat_paths)
 
     read_counts = self.read_array_to_counts(read_array, error_profile, sample_variance)
 
     self.__delete_analysis_paths__(read_stat_paths)
 
     return read_counts
+
+  def get_global_error(self, bulk_path, vital_stats, error_path=None):
+    read_stat_paths = self.run_read_stat_rule(bulk_path, vital_stats)
+    read_array = self.__path_to_read_array__(read_stat_paths["read_array"])
+    error_profile = self.__paths_to_error_profile__(read_stat_paths)
+
+    # save error profile if error_path is specified
+    if error_path is not None:
+      self.__save_error_profile__(error_profile, error_path)
+
+    self.__delete_analysis_paths__(read_stat_paths)
+
+    return error_profile
 
   def __delete_analysis_paths__(self, read_stat_paths):
     for analysis, path in read_stat_paths.items():
@@ -538,10 +568,16 @@ class ReadStatsFactory(object):
   def __paths_to_error_profile__(self, read_stat_paths):
     random_counts = pd.read_csv(read_stat_paths["random_counts"], header=None).values
     read_counts = pd.read_csv(read_stat_paths["mima_counts"], header=None).values
-    error_profile = self.get_error_profile(read_counts, random_counts)
-    sample_variance = self.__get_sample_variance__(read_counts)
+    error_profile = self.__get_error_profile__(read_counts, random_counts)
+    return error_profile
 
-    return error_profile, sample_variance
+  def __save_error_profile__(self, error_profile, error_path):
+      np.savetxt(error_path, error_profile.astype(int), delimiter=',')
+
+  def __paths_to_sample_variance__(self, read_stat_paths):
+    read_counts = pd.read_csv(read_stat_paths["mima_counts"], header=None).values
+    sample_variance = self.__get_sample_variance__(read_counts)
+    return sample_variance
 
   def __get_sample_variance__(self, read_counts):
     read_counts[0, :] = 0
@@ -551,7 +587,7 @@ class ReadStatsFactory(object):
     read_variance = read_counts[mask].std() / read_counts[mask].mean()
     return read_variance
 
-  def get_error_profile(self, read_counts, random_counts, thresh=None):
+  def __get_error_profile__(self, read_counts, random_counts, thresh=None):
     error_profile = self.__get_significantly_enriched__(read_counts, random_counts, thresh)
 
     error_profile = self.__remove_noise__(error_profile)
@@ -576,6 +612,10 @@ class ReadStatsFactory(object):
         dif_loci_y - 15 : dif_loci_y + 1,
       ]
       hi_thresh = hi_thresh.flatten()
+
+      # return a matrix of 0's when hi_thresh is invalid
+      if hi_thresh.shape[0] <= 0:
+        return np.zeros(dif_counts.shape)
 
       thresh = np.percentile(hi_thresh, 95)
 
@@ -691,6 +731,7 @@ class ReadStatsFactory(object):
 
   def __rationalise_error_profile__(self, error_profile):
     if error_profile.sum() > 0:
+      # ensure each row makes sense
       start_row = np.where(error_profile)[0].max()
       global_loci = 0
       for i in reversed(range(0, start_row + 1)):
@@ -700,9 +741,21 @@ class ReadStatsFactory(object):
         else:
           cur_loci = 0
 
-        # if cur_loci > global_loci:
         global_loci = cur_loci
         error_profile[i, : global_loci + 1] = True
+
+      # ensure each column makes sense
+      start_col = np.where(error_profile)[1].max()
+      global_loci = 0
+      for j in reversed(range(0, start_col + 1)):
+        error_bins_in_col = np.where(error_profile[:, j])[0]
+        if len(error_bins_in_col) > 0:
+          cur_loci = error_bins_in_col.max()
+        else:
+          cur_loci = 0
+
+        global_loci = cur_loci
+        error_profile[:global_loci + 1, j] = True
 
     return error_profile
 
@@ -858,14 +911,44 @@ class Telbam2Length(TelomerecatInterface):
     )
 
   def run_cmd(self):
-    self.run(
-      input_paths=self.cmd_args.input,
-      trim=self.cmd_args.trim,
-      output_path=self.cmd_args.output,
-      simulator_n=self.cmd_args.simulator_runs,
-      correct_f2a=self.cmd_args.enable_correction,
-      inserts_path=self.cmd_args.insert,
-      seed_randomness=self.cmd_args.seed_randomness
+    coverages = None
+    num_tels = None
+
+    if self.cmd_args.file_input:  # input is txt files containing telbam paths
+      if self.cmd_args.cov_ntel:  # file input contains coverage and number of telomeres too
+        telbams_paths = []
+        coverages = []
+        num_tels = []
+        for file in self.cmd_args.input:
+          with open(file, 'r') as f:
+            for line in f:
+              items = line.split(",")
+              telbams_paths.append(items[0])
+              coverages.append(items[1])
+              num_tels.append(items[2])
+      else:  # txt file input just has telbam paths
+        telbams_paths = []
+        for file in self.cmd_args.input:
+          with open(file, 'r') as f:
+            lines = [line.strip() for line in f]
+            telbams_paths.extend(lines)
+
+    else:  # input is already a list of telbam paths
+      telbams_paths = self.cmd_args.input
+
+    self.run(input_paths=telbams_paths,
+            trim=self.cmd_args.trim,
+            output_path=self.cmd_args.output,
+            simulator_n=self.cmd_args.simulator_runs,
+            correct_f2a=self.cmd_args.enable_correction,
+            inserts_path=self.cmd_args.insert,
+            bulk_path=self.cmd_args.pseudobulk,
+            error_path=self.cmd_args.error_path,
+            error_list=self.cmd_args.error_list,
+            cov_ntel=self.cmd_args.cov_ntel,
+            coverages=coverages,
+            num_tels=num_tels,
+            seed_randomness=self.cmd_args.seed_randomness
     )
 
   def run(
@@ -876,6 +959,12 @@ class Telbam2Length(TelomerecatInterface):
     correct_f2a=False,
     simulator_n=10,
     inserts_path=None,
+    bulk_path=None,
+    error_path=None,
+    error_list=False,
+    cov_ntel=False,
+    coverages=None,
+    num_tels=None,
     seed_randomness=False
   ):
 
@@ -888,13 +977,20 @@ class Telbam2Length(TelomerecatInterface):
       inserts_path (string): A path to a file containing insert length estimates
                    for each TELBAM. Formatted as follows:
                     example_telbam.bam, insert_mean, insert_sd
+      bulk_path (string): A path to a specified pseudobulk telbam (optional)
+      error_path (string): A directory path used to store error profiles as CSVs (optional)
+      error_list (bool): Denote whether to store non-global error profiles to a list (optional)
+      cov_ntel (bool): Denote whether coverages and num_tels have been provided 
+                    within the input_paths txt file (optional)
+      coverages (list): Coverages extracted from the original input_paths txt file
+      num_tels (list): Number of telomeres per sample extracted from the original input_paths txt file
     """
 
     self.__introduce__()
     names = [ os.path.basename(path).replace("_telbam", "") for path in input_paths ]
 
     output_csv_path = output_path
-    temp_csv_path = self.__get_temp_path__()
+    temp_csv_path = self.__get_temp_path__(cov_ntel)
 
     insert_length_generator = self.__get_insert_generator__(inserts_path)
 
@@ -906,8 +1002,33 @@ class Telbam2Length(TelomerecatInterface):
       self.temp_dir, self.total_procs, self.task_size, trim
     )
 
-    for sample_path, sample_name, in zip(input_paths, names):
-      sample_intro = "\t- %s | %s\n" % (sample_name, self.__get_date_time__())
+    # find global error profile when pseudobulk telbam path is provided
+    if bulk_path is not None:
+      vital_stats = vital_stats_finder.get_vital_stats(bulk_path)
+
+      self.__check_vital_stats_insert_size__(inserts_path,
+                                             insert_length_generator,
+                                             vital_stats)
+
+      # specify bulk sample name in error path
+      if error_path is not None:
+        current_error_path = error_path
+      else:
+        current_error_path = None
+
+      global_error_profile = self.__get_global_error__(bulk_path,
+                                                       vital_stats,
+                                                       self.total_procs,
+                                                       trim,
+                                                       error_path=current_error_path)
+    # set global_error_profile to None so its get calculated on a per-telbam basis in __get_read_types__()
+    else:
+      global_error_profile = None
+
+
+    # write read_type_counts to temp csv for each telbam
+    for i, sample_path in enumerate(input_paths):
+      sample_intro = "\t- %s | %s\n" % (names[i], self.__get_date_time__())
 
       self.__output__(sample_intro, 2)
 
@@ -917,11 +1038,31 @@ class Telbam2Length(TelomerecatInterface):
         inserts_path, insert_length_generator, vital_stats
       )
 
+      # create file name for current error profile
+      if error_path is not None and global_error_profile is None:
+        current_error_path = error_path
+      else:
+        current_error_path = None
+
       read_type_counts = self.__get_read_types__(
-        sample_path, vital_stats, self.total_procs, trim, seed_randomness
+        sample_path, vital_stats, self.total_procs, trim, \
+        seed_randomness, names[i], error_profile=global_error_profile, \
+        error_path=current_error_path, error_list=error_list
       )
 
-      self.__write_to_csv__(read_type_counts, vital_stats, temp_csv_path, sample_name)
+      # only include coverages and num_tels if they are non-empty lists
+      if cov_ntel:
+        self.__write_to_csv__(read_type_counts,
+                              vital_stats,
+                              temp_csv_path,
+                              names[i],
+                              float(coverages[i]),
+                              float(num_tels[i]))
+      else:
+        self.__write_to_csv__(read_type_counts,
+                              vital_stats,
+                              temp_csv_path,
+                              names[i])
 
     self.__output__("\n", 1)
     length_interface = Csv2Length(
@@ -967,8 +1108,8 @@ class Telbam2Length(TelomerecatInterface):
       )
     elif vital_stats["insert_mean"] == -1:
       default_mean, default_sd = 350, 25
-      vital_stats["insert_mean"] = 350
-      vital_stats["insert_sd"] = 25
+      vital_stats["insert_mean"] = default_mean
+      vital_stats["insert_sd"] = default_sd
       self.__output__(
         "\t\t+ Failed to estimate insert size. Using default: %d,%d\n"
         % (default_mean, default_sd),
@@ -976,46 +1117,87 @@ class Telbam2Length(TelomerecatInterface):
       )
 
   def __get_read_types__(
-    self, sample_path, vital_stats, total_procs, trim, seed_randomness, read_stats_factory=None
+    self, sample_path, vital_stats, total_procs, trim, seed_randomness, sample_name,
+    read_stats_factory=None, error_profile=None, error_path=None, error_list=False
   ):
 
     if read_stats_factory is None:
       read_stats_factory = ReadStatsFactory(
-        temp_dir=self.temp_dir, total_procs=total_procs, trim_reads=trim, seed_randomness=seed_randomness, debug_print=False
+        temp_dir=self.temp_dir, total_procs=total_procs, trim_reads=trim,
+        seed_randomness=seed_randomness, debug_print=False
       )
 
-    read_type_counts = read_stats_factory.get_read_counts(sample_path, vital_stats)
+    read_type_counts = read_stats_factory.get_read_counts(sample_path,
+                                                          vital_stats,
+                                                          sample_name=sample_name,
+                                                          error_profile=error_profile,
+                                                          error_path=error_path,
+                                                          error_list=error_list)
     return read_type_counts
 
-  def __get_temp_path__(self):
+  def __get_global_error__(self, sample_path,
+                                 vital_stats,
+                                 total_procs,
+                                 trim,
+                                 read_stats_factory=None,
+                                 error_path=None):
+    if read_stats_factory is None:
+      read_stats_factory = ReadStatsFactory(temp_dir=self.temp_dir,
+                                            total_procs=total_procs,
+                                            trim_reads=trim,
+                                            debug_print=False)
+
+    # build error profile
+    error_profile = read_stats_factory.get_global_error(sample_path,
+                                                        vital_stats,
+                                                        error_path=error_path)
+
+    return error_profile
+
+  def __get_temp_path__(self, cov_ntel=False):
     temp_path = os.path.join(self.temp_dir, "telomerecat_temp_%d.csv" % (time.time()))
-    self.__create_output_file__(temp_path)
+    self.__create_output_file__(temp_path, cov_ntel)
     return temp_path
 
-  def __create_output_file__(self, output_csv_path):
+  def __create_output_file__(self, output_csv_path, cov_ntel=False):
     with open(output_csv_path, "w") as total:
-      header = (
-        "Sample,F1,F2,F4,Psi,Insert_mean,Insert_sd," "Read_length,Initial_read_length\n"
-      )
+      # use if-statement to know whether coverage & num_tel belong in csv header
+      if cov_ntel:
+        header = ("Sample,F1,F2,F4,Psi,Insert_mean,Insert_sd,"
+                  "Read_length,Initial_read_length,coverage,num_tel\n")
+      else:
+        header = ("Sample,F1,F2,F4,Psi,Insert_mean,Insert_sd,"
+                  "Read_length,Initial_read_length\n")
       total.write(header)
     return output_csv_path
 
-  def __write_to_csv__(self, read_type_counts, vital_stats, output_csv_path, name):
+  def __write_to_csv__(self, read_type_counts, vital_stats, output_csv_path, name, coverage=None, num_tel=None):
     with open(output_csv_path, "a") as counts:
-      counts.write(
-        "%s,%d,%d,%d,%.3f,%.3f,%.3f,%d,%d\n"
-        % (
-          name,
-          read_type_counts["F1"],
-          read_type_counts["F2"],
-          read_type_counts["F4"],
-          read_type_counts["sample_variance"],
-          vital_stats["insert_mean"],
-          vital_stats["insert_sd"],
-          vital_stats["read_len"],
-          vital_stats["initial_read_len"],
-        )
-      )
+      # use if-statement to see whether we have a coverage or num_tel to write on this line
+      if coverage is None or num_tel is None:
+        counts.write("%s,%d,%d,%d,%.3f,%.3f,%.3f,%d,%d\n" % \
+                                    (name,
+                                     read_type_counts["F1"],
+                                     read_type_counts["F2"],
+                                     read_type_counts["F4"],
+                                     read_type_counts["sample_variance"],
+                                     vital_stats["insert_mean"],
+                                     vital_stats["insert_sd"],
+                                     vital_stats["read_len"],
+                                     vital_stats["initial_read_len"]))
+      else:
+        counts.write("%s,%d,%d,%d,%.3f,%.3f,%.3f,%d,%d,%.6f,%.3f\n" % \
+                                    (name,
+                                     read_type_counts["F1"],
+                                     read_type_counts["F2"],
+                                     read_type_counts["F4"],
+                                     read_type_counts["sample_variance"],
+                                     vital_stats["insert_mean"],
+                                     vital_stats["insert_sd"],
+                                     vital_stats["read_len"],
+                                     vital_stats["initial_read_len"],
+                                     coverage,
+                                     num_tel))
 
   def get_parser(self):
     parser = self.default_parser()
@@ -1039,7 +1221,17 @@ class Telbam2Length(TelomerecatInterface):
       % (self.instance_name, self.header_line, self.header_line,)
     )
 
-    for arg_name in ['input_telbam', 'output_csv', 'trim', 'nreads_for_task']:
+    arg_list = ['input_telbam',
+                'output_csv',
+                'trim',
+                'nreads_for_task',
+                'file_input',
+                'pseudobulk',
+                'error_path',
+                'error_list',
+                'cov_ntel']
+
+    for arg_name in arg_list:
       add_arg[arg_name](parser)
 
     return parser
