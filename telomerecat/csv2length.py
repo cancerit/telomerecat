@@ -219,9 +219,11 @@ class Csv2Length(core.TelomerecatInterface):
       counts["F2a_c"] = counts["F2a"]
 
     if "coverage" in counts.columns and "num_tel" in counts.columns:
+      # use coverage & number of telomeres to estimate mean telomere length
       lengths = self.__get_cov_ntel_lengths__(counts)
       counts["Length"] = lengths
-      counts["Length_std"] = [0.000] * len(lengths)  # stdev is always 0 with cov_ntel_lengths
+      # use simulator to generate length standard deviation (uncertainty based on coverage)
+      __, counts["Length_std"] = self.__get_lengths__(counts, seed_randomness, simulator_n)
     elif simulate_lengths:
       counts["Length"], counts["Length_std"] = self.__get_lengths__(counts, seed_randomness, simulator_n)
     else:
