@@ -1,5 +1,4 @@
 import sys
-from .version import __version__
 
 # oh 42, the answer to everything.
 RANDOM_SEED = 42

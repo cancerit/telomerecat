@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 
 from setuptools import setup
-from telomerecat.version import __version__
 
 setup(
   name="telomerecat",
   description="Telomere Computational Analysis Tool",
-  version=__version__,
+  version='3.4.1',
   author="JHR Farmery",
   license="GPL",
   python_requires='>= 3.6',
@@ -17,4 +16,5 @@ setup(
   include_package_data=True,
   scripts=["./telomerecat/bin/telomerecat"],
   zip_safe=False,
+
 )

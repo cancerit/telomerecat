@@ -1,9 +1,7 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # main
-import sys
 import textwrap
-import traceback
-import multiprocessing
+import pkg_resources
 
 # Do not remove these imports
 # Crucial for pyinstaller (as of v2.0)
@@ -11,7 +9,6 @@ from telomerecat.bam2length import Bam2Length
 from telomerecat.bam2telbam import Bam2Telbam
 from telomerecat.telbam2length import Telbam2Length
 from telomerecat.csv2length import Csv2Length
-from telomerecat import __version__
 
 import parabam
 
@@ -38,7 +35,7 @@ def get_help_text():
     telomerecat
     -----------------------------------------------------------------------------
 
-    About: 
+    About:
       Telomere Computational Analysis Tool
 
     Version:
@@ -51,20 +48,20 @@ def get_help_text():
 
       telomerecat bam2length -p8 { path_to_bamfile(s) }
 
-      The above genereates a CSV file containing an estimation of average 
+      The above genereates a CSV file containing an estimation of average
       telomere length for BAM files provided.
 
     More:
       Users may wish to segregate the heavy lifting process of creating
-      a telbam (essentially a subset of telomeric reads in a BAM file) 
+      a telbam (essentially a subset of telomeric reads in a BAM file)
       from the reletively quick process of generating the length estimation.
 
       Generating telbams first, (with the command `bam2telbam`) allows
-      users to run multiple analysis on the same file without having to 
+      users to run multiple analysis on the same file without having to
       run the entire process multiple times. Type `telomerecat bam2telbam`
       for more information.
 
-      If you have already generated a set of telbams and just want to 
+      If you have already generated a set of telbams and just want to
       run length estimation on these files type `telomerecat telbam2length`
       for more information.
 
@@ -74,7 +71,7 @@ def get_help_text():
       telbam2length   Estimate telomere length within TELBAMs
     """.expandtabs()
     )
-    % (__version__,)
+    % (pkg_resources.require("telomerecat")[0].version,)
   )
   return help_text
 

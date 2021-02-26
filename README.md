@@ -22,6 +22,14 @@ Installation is via `pip`.  Simply execute with the URL to a package release, e.
 pip install https://github.com/cancerit/telomerecat/archive/3.4.0.tar.gz
 ```
 
+## Basic usage
+
+Please see the command line help:
+
+```bash
+telomerecat --help
+```
+
 ### Package Dependancies
 
 `pip` will install the relevant dependancies, listed here for convenience:

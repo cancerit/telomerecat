@@ -18,7 +18,7 @@ curl
 # zlib1g-dev libbz2-dev liblzma-dev libcurl4-gnutls-dev are for building pysam
 
 ENV CGP_OPT /opt/wtsi-cgp
-ENV PYTHONPATH $CGP_OPT/lib/python3.6/site-packages
+ENV PYTHONPATH $CGP_OPT/lib/python3.8/site-packages
 RUN mkdir -p $PYTHONPATH
 
 RUN locale-gen en_US.UTF-8
@@ -34,7 +34,8 @@ RUN curl -sSL https://github.com/cancerit/parabam/archive/${BRANCH_OR_TAG_PARABA
 && python3 setup.py install --prefix=$CGP_OPT
 
 # build the tools in this repo, separate to reduce build time on errors
-COPY . .
+COPY setup.py .
+COPY telomerecat telomerecat
 RUN python3 setup.py sdist
 RUN python3 setup.py install --prefix=$CGP_OPT
 
@@ -52,7 +53,7 @@ locales \
 ca-certificates \
 time \
 unattended-upgrades \
-python3 \
+python3 python3-pkg-resources \
 zlib1g-dev libbz2-dev liblzma-dev libcurl4-gnutls-dev && \
 unattended-upgrade -d -v && \
 apt-get remove -yq unattended-upgrades && \
@@ -63,7 +64,7 @@ RUN update-locale LANG=en_US.UTF-8
 
 ENV CGP_OPT /opt/wtsi-cgp
 ENV PATH $CGP_OPT/bin:$CGP_OPT/bin:$PATH
-ENV PYTHONPATH $CGP_OPT/lib/python3.6/site-packages
+ENV PYTHONPATH $CGP_OPT/lib/python3.8/site-packages
 ENV LD_LIBRARY_PATH $OPT/lib
 ENV LC_ALL en_US.UTF-8
 ENV LANG en_US.UTF-8
