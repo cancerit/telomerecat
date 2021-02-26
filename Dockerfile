@@ -1,8 +1,9 @@
-FROM ubuntu:18.04 as builder
+FROM ubuntu:20.04 as builder
 USER root
 
 # Version of tools that are going to be installed.
-ENV PARABAM_VER '2.3.0'
+# can specify  "hotfix/X.X.X", "feature/fixstuff" or "3.4.1"
+ARG BRANCH_OR_TAG_PARABAM="hotfix/2.3.2"
 
 RUN apt-get -yq update
 RUN apt-get install -yq --no-install-recommends \
@@ -13,13 +14,12 @@ gcc \
 pkg-config \
 python3 python3-dev python3-pip python3-setuptools \
 zlib1g-dev libbz2-dev liblzma-dev libcurl4-gnutls-dev \
-git
+curl
 # zlib1g-dev libbz2-dev liblzma-dev libcurl4-gnutls-dev are for building pysam
-# git is for parabam installation from source
 
 ENV CGP_OPT /opt/wtsi-cgp
-RUN mkdir $CGP_OPT
-ENV PYTHONPATH $CGP_OPT/python-lib/lib/python3.6/site-packages
+ENV PYTHONPATH $CGP_OPT/lib/python3.6/site-packages
+RUN mkdir -p $PYTHONPATH
 
 RUN locale-gen en_US.UTF-8
 RUN update-locale LANG=en_US.UTF-8
@@ -28,21 +28,21 @@ ENV LANG en_US.UTF-8
 
 RUN pip3 install wheel cython
 
-RUN pip3 install --install-option="--prefix=$CGP_OPT/python-lib" https://github.com/cancerit/parabam/releases/download/${PARABAM_VER}/parabam-${PARABAM_VER}.tar.gz
+RUN curl -sSL https://github.com/cancerit/parabam/archive/${BRANCH_OR_TAG_PARABAM}.tar.gz | tar zx \
+&& cd parabam* \
+&& python3 setup.py sdist \
+&& python3 setup.py install --prefix=$CGP_OPT
 
 # build the tools in this repo, separate to reduce build time on errors
 COPY . .
-# git clone https://github.com/cancerit/telomerecat.git
-# cd telomerecat
-# git checkout feature/explore_to_py3
 RUN python3 setup.py sdist
-RUN pip3 install --install-option="--prefix=$CGP_OPT/python-lib" dist/$(ls -1 dist/)
+RUN python3 setup.py install --prefix=$CGP_OPT
 
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 
 LABEL maintainer="cgphelp@sanger.ac.uk" \
       uk.ac.sanger.cgp="Cancer, Ageing and Somatic Mutation, Wellcome Trust Sanger Institute" \
-      version="3.4.0" \
+      version="3.4.1" \
       description="telomerecat docker"
 
 RUN apt-get -yq update
@@ -62,8 +62,8 @@ RUN locale-gen en_US.UTF-8
 RUN update-locale LANG=en_US.UTF-8
 
 ENV CGP_OPT /opt/wtsi-cgp
-ENV PATH $CGP_OPT/bin:$CGP_OPT/python-lib/bin:$PATH
-ENV PYTHONPATH $CGP_OPT/python-lib/lib/python3.6/site-packages
+ENV PATH $CGP_OPT/bin:$CGP_OPT/bin:$PATH
+ENV PYTHONPATH $CGP_OPT/lib/python3.6/site-packages
 ENV LD_LIBRARY_PATH $OPT/lib
 ENV LC_ALL en_US.UTF-8
 ENV LANG en_US.UTF-8
