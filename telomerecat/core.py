@@ -38,7 +38,7 @@ class TelomerecatInterface(parabam.core.Interface, metaclass=ABCMeta):
 
   def __output__(self, outstr, level=-1):
     if self.verbose and (self.verbose >= level or level == -1):
-      print(outstr, end='')
+      print(outstr)
 
   def default_parser(self):
     parser = super(TelomerecatInterface, self).default_parser()
