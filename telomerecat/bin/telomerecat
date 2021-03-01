@@ -69,6 +69,7 @@ def get_help_text():
       bam2length      Estimate telomere length within BAM files
       bam2telbam      Create telbams from BAM files
       telbam2length   Estimate telomere length within TELBAMs
+      csv2length      Estimate telomere length using bam2length csv files
     """.expandtabs()
     )
     % (pkg_resources.require("telomerecat")[0].version,)

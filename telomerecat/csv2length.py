@@ -20,7 +20,7 @@ import pandas as pd
 from argparse import SUPPRESS
 from functools import partial
 from shutil import copy
-from multiprocessing import Pool, freeze_support
+from multiprocessing import Pool, freeze_support, get_context
 
 from telomerecat import core
 
@@ -167,7 +167,7 @@ class Csv2Length(core.TelomerecatInterface):
 
     self.run(
       input_paths=self.cmd_args.input,
-      correct_f2a=not self.cmd_args.disable_correction,
+      correct_f2a=self.cmd_args.enable_correction,
       output_paths=output_paths,
       prior_weight=self.cmd_args.prior_weight,
       seed_randomness=self.cmd_args.seed_randomness,
@@ -229,7 +229,6 @@ class Csv2Length(core.TelomerecatInterface):
 
     theta_observed = counts["F2a"] / (counts["F2"] + counts["F4"])
 
-    prior_weight = 3
     theta_expected = sum(theta_observed * counts["F2"]) / sum(counts["F2"])
 
     theta_corrected = (
@@ -372,19 +371,19 @@ def estimator_process(job, insert_mu, insert_sigma, complete, boundary, read_len
 def run_simulator_par(insert_mu, insert_sigma, complete, boundary, proc, read_len, seed_randomness, simulator_n):
 
   freeze_support()
-  p = Pool(proc)
-  sim_partial = partial(
-    estimator_process,
-    insert_mu=insert_mu,
-    insert_sigma=insert_sigma,
-    complete=complete,
-    boundary=boundary,
-    read_len=read_len,
-    seed_randomness=seed_randomness
-  )
+  with get_context("spawn").Pool(proc) as p:
+    sim_partial = partial(
+      estimator_process,
+      insert_mu=insert_mu,
+      insert_sigma=insert_sigma,
+      complete=complete,
+      boundary=boundary,
+      read_len=read_len,
+      seed_randomness=seed_randomness
+    )
 
-  results = p.map(sim_partial, range(simulator_n))
-  p.close()
+    results = p.map(sim_partial, range(simulator_n))
+    p.close()
   check_results(results)
   return (np.mean(results), np.std(results))
 

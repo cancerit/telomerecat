@@ -83,17 +83,10 @@ class TelomerecatInterface(parabam.core.Interface, metaclass=ABCMeta):
       # Use the seed (42) for all randomnesses in telomerecat to produce stable results.
       help=SUPPRESS  # this option is hidden from users.
     )
-    # TODO: Implement these additional parameters:
-    #
-    # parser.add_argument(
-    #     '-b', '--brief_csv',
-    #     action="store_true", default=False,
-    #     help=('The output CSV will be comprised of\n'
-    #            'only the essential columns'))
-    # parser.add_argument(
-    #     '-w', '--prior_weight',
-    #     metavar='INT', type=int, default=3,
-    #     help=('The weight given to the prior expectation\n'
-    #           'in F2a correction [Default 3]'))
+    parser.add_argument(
+        '-w', '--prior_weight',
+        metavar='INT', type=int, default=3,
+        help=('The weight given to the prior expectation\n'
+              'in F2a correction [Default 3]'))
 
     return parser
