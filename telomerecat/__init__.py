@@ -77,6 +77,5 @@ add_arg = {
 }
 
 def exit_with_msg(message):
-  sys.stderr.write(message)
-  sys.stderr.flush()
+  print(message, file=sys.stderr)
   sys.exit(1)

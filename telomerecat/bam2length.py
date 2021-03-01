@@ -19,7 +19,7 @@ class Bam2Length(TelomerecatInterface):
     self,
     temp_dir=None,
     task_size=250000,
-    total_procs=8,
+    total_procs=4,
     reader_n=1,
     verbose=False,
     announce=True,
@@ -122,7 +122,7 @@ class Bam2Length(TelomerecatInterface):
 
       If you wish to generate TELBAMS seperately from length estimation
       you should use the bam2telbam command.
-      
+
       Type `telomerecat bam2telbam` to find out more.
 
     %s

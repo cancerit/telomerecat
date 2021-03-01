@@ -6,7 +6,6 @@ It's primary responsibility is to define the default parameters for argparse
 Author: jhrf
 """
 
-import sys
 from argparse import SUPPRESS
 import parabam
 from abc import ABCMeta
@@ -19,7 +18,7 @@ class TelomerecatInterface(parabam.core.Interface, metaclass=ABCMeta):
     instance_name,
     temp_dir=None,
     task_size=10000,
-    total_procs=8,
+    total_procs=4,
     reader_n=2,
     verbose=False,
     announce=True,
@@ -39,8 +38,7 @@ class TelomerecatInterface(parabam.core.Interface, metaclass=ABCMeta):
 
   def __output__(self, outstr, level=-1):
     if self.verbose and (self.verbose >= level or level == -1):
-      sys.stdout.write(outstr)
-      sys.stdout.flush()
+      print(outstr, end='')
 
   def default_parser(self):
     parser = super(TelomerecatInterface, self).default_parser()

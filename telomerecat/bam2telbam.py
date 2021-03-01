@@ -7,7 +7,6 @@ canonic TTAGGG telomere sequence
 Author: jhrf
 """
 
-import sys
 import os
 import textwrap
 import gc
@@ -44,7 +43,7 @@ class Bam2Telbam(parabam.core.Interface):
     self,
     temp_dir=None,
     task_size=250000,
-    total_procs=8,
+    total_procs=4,
     reader_n=2,
     verbose=False,
     announce=True,
@@ -70,16 +69,16 @@ class Bam2Telbam(parabam.core.Interface):
     self.run(input_paths=self.cmd_args.input, outbam_dir=self.cmd_args.outbam_dir)
 
   def run(self, input_paths, outbam_dir=None):
-    """The main function for invoking the part of the 
+    """The main function for invoking the part of the
        program which creates a telbam from a bam
 
     Arguments:
       bams (list): The BAM files we wish to run telomerecat telbam on
       total_procs (int): The maximum numbers of task that will be run at one time
       task_size (int): The amount of reads that any one task will process concurrently
-      verbose (int): Expects an int from 0 to 2. 
+      verbose (int): Expects an int from 0 to 2.
                The level of output produced by telomerecat
-      keep_in_temp (bool): Files will be kept in temp file after processing. 
+      keep_in_temp (bool): Files will be kept in temp file after processing.
                  Useful for incorporation into pipelines
       announce (bool): Specify whether the program returns a welcome string."""
 
@@ -97,17 +96,15 @@ class Bam2Telbam(parabam.core.Interface):
     if not keep_in_temp:
       # check if the folder is writable
       if not os.path.exists(outbam_dir):
-        exit_with_msg(f'Error: can not find outbam_dir path: \'{outbam_dir}\'.\n')
+        exit_with_msg(f"Error: can not find outbam_dir path: '{outbam_dir}'")
       if not os.access(outbam_dir, os.W_OK | os.X_OK):
-        exit_with_msg(f'Error: do not have right permission to write into outbam_dir path: \'{outbam_dir}\'.\n')
+        exit_with_msg(f"Error: do not have right permission to write into outbam_dir path: '{outbam_dir}'")
 
     for input_path in input_paths:
 
       if self.verbose:
-        sys.stdout.write(" Generating TELBAM from: %s\n" % (input_path,))
-        sys.stdout.write(
-          "\t- TELBAM generation started %s\n" % (self.__get_date_time__(),)
-        )
+        print(f" Generating TELBAM from: {input_path}")
+        print(f"\t- TELBAM generation started {self.__get_date_time__()}")
 
       subset_interface = parabam.Subset(
         temp_dir=self.temp_dir,
@@ -128,9 +125,7 @@ class Bam2Telbam(parabam.core.Interface):
         outbam_dir=outbam_dir
       )
       if self.verbose:
-        sys.stdout.write(
-          "\t- TELBAM generation finished %s\n\n" % (self.__get_date_time__(),)
-        )
+        print(f"\t- TELBAM generation finished {self.__get_date_time__()}")
 
       gc.collect()
       final_output_paths.update(telbam_paths)
@@ -145,16 +140,16 @@ class Bam2Telbam(parabam.core.Interface):
     %s
     %s
 
-       The bam2telbam command allows you to generate a TELBAM 
+       The bam2telbam command allows you to generate a TELBAM
        from a parent BAM file. A TELBAM is a file including all of the
        reads with at least 2 occurences of the telomeric hexamer.
 
        Once you have genereated a TELBAM you may then generate length
        estimates more quickly, when compared to running the `bam2length`
-       command on a full BAM file. This is helpful if you intend to 
-       generate TL estimates more than once or if you require a  
+       command on a full BAM file. This is helpful if you intend to
+       generate TL estimates more than once or if you require a
        collection of telomere reads.
-   
+
        Given the following BAM file:
 
          example_bam_name.bam

@@ -839,7 +839,7 @@ class Telbam2Length(TelomerecatInterface):
     self,
     temp_dir=None,
     task_size=10000,
-    total_procs=8,
+    total_procs=4,
     reader_n=2,
     verbose=False,
     announce=True,
@@ -898,18 +898,14 @@ class Telbam2Length(TelomerecatInterface):
 
     insert_length_generator = self.__get_insert_generator__(inserts_path)
 
-    self.__output__(
-      " Collecting meta-data for all samples | %s\n" % (self.__get_date_time__(),), 1
-    )
+    self.__output__(f" Collecting meta-data for all samples | {self.__get_date_time__()}", 1)
 
     vital_stats_finder = VitalStatsFinder(
       self.temp_dir, self.total_procs, self.task_size, trim
     )
 
     for sample_path, sample_name, in zip(input_paths, names):
-      sample_intro = "\t- %s | %s\n" % (sample_name, self.__get_date_time__())
-
-      self.__output__(sample_intro, 2)
+      self.__output__(f"\t- {sample_name} | {self.__get_date_time__()}", 2)
 
       vital_stats = vital_stats_finder.get_vital_stats(sample_path)
 
@@ -923,7 +919,7 @@ class Telbam2Length(TelomerecatInterface):
 
       self.__write_to_csv__(read_type_counts, vital_stats, temp_csv_path, sample_name)
 
-    self.__output__("\n", 1)
+    self.__output__('', 1)
     length_interface = Csv2Length(
       temp_dir=self.temp_dir,
       total_procs=self.total_procs,
@@ -946,8 +942,8 @@ class Telbam2Length(TelomerecatInterface):
     return output_csv_path
 
   def __print_output_information__(self, output_csv_path):
-    self.__output__((" Length estimation results " "written to the following file:\n"), 1)
-    self.__output__("\t./%s\n\n" % (os.path.basename(output_csv_path,)))
+    self.__output__(" Length estimation results written to the following file:", 1)
+    self.__output__(f"\t./{os.path.basename(output_csv_path)}\n", 1)  # extra line feed
 
   def __get_insert_generator__(self, inserts_path):
     if inserts_path:
@@ -962,18 +958,12 @@ class Telbam2Length(TelomerecatInterface):
       insert_mean, insert_sd = insert_length_generator.__next__()
       vital_stats["insert_mean"] = insert_mean
       vital_stats["insert_sd"] = insert_sd
-      self.__output__(
-        "\t\t+ Using user defined insert size: %d,%d\n" % (insert_mean, insert_sd), 2
-      )
+      self.__output__(f"\t\t+ Using user defined insert size: {int(insert_mean)},{int(insert_sd)}", 2)
     elif vital_stats["insert_mean"] == -1:
       default_mean, default_sd = 350, 25
       vital_stats["insert_mean"] = 350
       vital_stats["insert_sd"] = 25
-      self.__output__(
-        "\t\t+ Failed to estimate insert size. Using default: %d,%d\n"
-        % (default_mean, default_sd),
-        2,
-      )
+      self.__output__(f"\t\t+ Failed to estimate insert size. Using default: {int(default_mean)},{int(default_sd)}", 2)
 
   def __get_read_types__(
     self, sample_path, vital_stats, total_procs, trim, seed_randomness, read_stats_factory=None
