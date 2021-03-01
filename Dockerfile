@@ -2,8 +2,8 @@ FROM ubuntu:20.04 as builder
 USER root
 
 # Version of tools that are going to be installed.
-# can specify  "hotfix/X.X.X", "feature/fixstuff" or "3.4.1"
-ARG BRANCH_OR_TAG_PARABAM="hotfix/2.3.2"
+# can specify  "<commit-id>", "hotfix/X.X.X", "feature/fixstuff" or "3.4.1"
+ARG BRANCH_OR_TAG_PARABAM="bfb13da2986ae0bcd54ec55083781e702f363519"
 
 RUN apt-get -yq update
 RUN apt-get install -yq --no-install-recommends \
