@@ -407,7 +407,7 @@ class VitalStatsFinder(object):
     self._trim_length = trim_length
 
   def __csv_to_dict__(self, stats_path):
-    insert_dat = pd.read_csv(stats_path).to_dict(orient="record")[0]
+    insert_dat = pd.read_csv(stats_path).to_dict(orient="records")[0]
 
     ins_N = int(insert_dat["N"])
     if ins_N == 0:
