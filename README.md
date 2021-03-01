@@ -14,12 +14,29 @@ Telomerecat is available as a Docker container on [Quay.io][quay-repo].
 
 [![Quay Badge][quay-status]][quay-repo]
 
+No "latest" image is defined, you need to specify the version you require, e.g.:
+
+```bash
+export VERSION_TEL=3.4.1 # update as appropriate
+docker pull quay.io/wtsicgp/telomerecat:${VERSION_TEL}
+```
+
+## Singularity
+
+The docker container is known to work with singularity, save the image locally via:
+
+```bash
+export VERSION_TEL=3.4.1 # update as appropriate
+singularity pull docker://quay.io/wtsicgp/telomerecat:${VERSION_TEL}
+```
+
 ## INSTALL
 
 Installation is via `pip`.  Simply execute with the URL to a package release, e.g.:
 
 ```bash
-pip install https://github.com/cancerit/telomerecat/archive/3.4.0.tar.gz
+export VERSION_TEL=3.4.1 # update as appropriate
+pip3 install https://github.com/cancerit/telomerecat/archive/${VERSION_TEL}.tar.gz
 ```
 
 ## Basic usage
