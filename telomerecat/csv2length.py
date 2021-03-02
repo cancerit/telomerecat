@@ -371,7 +371,8 @@ def estimator_process(job, insert_mu, insert_sigma, complete, boundary, read_len
 def run_simulator_par(insert_mu, insert_sigma, complete, boundary, proc, read_len, seed_randomness, simulator_n):
 
   freeze_support()
-  with get_context("spawn").Pool(proc) as p:
+  # although spawn is preferred docker containers have to be started with `--init`
+  with Pool(proc) as p:
     sim_partial = partial(
       estimator_process,
       insert_mu=insert_mu,
