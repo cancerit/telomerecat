@@ -371,19 +371,21 @@ def estimator_process(job, insert_mu, insert_sigma, complete, boundary, read_len
 def run_simulator_par(insert_mu, insert_sigma, complete, boundary, proc, read_len, seed_randomness, simulator_n):
 
   freeze_support()
-  with get_context("forkserver").Pool(proc) as p:
-    sim_partial = partial(
-      estimator_process,
-      insert_mu=insert_mu,
-      insert_sigma=insert_sigma,
-      complete=complete,
-      boundary=boundary,
-      read_len=read_len,
-      seed_randomness=seed_randomness
-    )
+  #with get_context("forkserver").Pool(proc) as p:
+  p = Pool(proc)
+  sim_partial = partial(
+    estimator_process,
+    insert_mu=insert_mu,
+    insert_sigma=insert_sigma,
+    complete=complete,
+    boundary=boundary,
+    read_len=read_len,
+    seed_randomness=seed_randomness
+  )
 
-    results = p.map(sim_partial, range(simulator_n))
-    p.close()
+  results = p.map(sim_partial, range(simulator_n))
+  p.close()
+
   check_results(results)
   return (np.mean(results), np.std(results))
 
