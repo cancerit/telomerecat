@@ -12,9 +12,19 @@ def add_input_telbam_arg(parser):
 def add_input_bam_arg(parser):
   parser.add_argument(
     "input",
-    metavar="BAM(S)",
+    metavar="BAM/CRAM(S)",
     nargs="+",
-    help=("BAM file(s) for which we wish to\n" "generate telomere length estimates"),
+    help=("BAM/CRAM file(s) for which we wish to\n" "generate telomere length estimates"),
+  )
+
+def add_ref_arg(parser):
+  parser.add_argument(
+    "-r",
+    "--reference",
+    metavar="FASTA",
+    type=str,
+    default=None,
+    help=("Reference genome for CRAM inputs"),
   )
 
 
@@ -73,7 +83,8 @@ add_arg = {
   'trim': add_trim_arg,
   'outbam_dir': add_outbam_dir_arg,
   'output_csv': add_output_csv_arg,
-  'nreads_for_task': add_nreads_for_each_task_arg
+  'nreads_for_task': add_nreads_for_each_task_arg,
+  'reference': add_ref_arg
 }
 
 def exit_with_msg(message):

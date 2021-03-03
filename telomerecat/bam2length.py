@@ -8,7 +8,7 @@ Author: jhrf
 """
 
 import textwrap
-
+from argparse import SUPPRESS
 from telomerecat.core import TelomerecatInterface
 
 # import args
@@ -130,8 +130,11 @@ class Bam2Length(TelomerecatInterface):
       % (self.instance_name, self.header_line, self.header_line,)
     )
 
-    for arg_name in ['input_bam', 'outbam_dir', 'output_csv', 'trim', 'nreads_for_task']:
+    for arg_name in ['input_bam', 'outbam_dir', 'output_csv', 'trim', 'nreads_for_task', 'reference']:
       add_arg[arg_name](parser)
+
+    parser.add_argument("-s", help=SUPPRESS)
+    parser.add_argument("-f", help=SUPPRESS)
 
     return parser
 

@@ -2,6 +2,7 @@
 # main
 import textwrap
 import pkg_resources
+import sys
 
 # Do not remove these imports
 # Crucial for pyinstaller (as of v2.0)
@@ -10,6 +11,8 @@ from telomerecat.bam2telbam import Bam2Telbam
 from telomerecat.telbam2length import Telbam2Length
 from telomerecat.csv2length import Csv2Length
 
+#from telomerecat2.cli import cli as tc2_cli
+
 import parabam
 
 
@@ -17,6 +20,7 @@ def handle_input():
   command_map = {
     "bam2length": Bam2Length,
     "bam2telbam": Bam2Telbam,
+    # "bam2telbam": tc2_cli,
     "telbam2length": Telbam2Length,
     "csv2length": Csv2Length,
   }
@@ -70,6 +74,7 @@ def get_help_text():
       bam2telbam      Create telbams from BAM files
       telbam2length   Estimate telomere length within TELBAMs
       csv2length      Estimate telomere length using bam2length csv files
+      version         Prints the version and exits
     """.expandtabs()
     )
     % (pkg_resources.require("telomerecat")[0].version,)
@@ -78,4 +83,9 @@ def get_help_text():
 
 
 if __name__ == "__main__":
+  if len(sys.argv) >= 2:
+    if sys.argv[1] == 'version':
+      print(pkg_resources.require("telomerecat")[0].version)
+      sys.exit(0)
+
   handle_input()

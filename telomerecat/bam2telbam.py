@@ -9,7 +9,8 @@ Author: jhrf
 
 import os
 import textwrap
-import gc
+from argparse import SUPPRESS
+import telomerecat.telbam as telbam
 
 import parabam
 
@@ -84,12 +85,6 @@ class Bam2Telbam(parabam.core.Interface):
 
     self.__introduce__()
 
-    subset_types = ["telbam"]
-    tel_pats = ["TTAGGGTTAGGG", "CCCTAACCCTAA"]
-
-    # need to define my constants and engine here:
-    telbam_constants = {"thresh": 1, "tel_pats": tel_pats}
-
     final_output_paths = {}
 
     keep_in_temp = outbam_dir is None
@@ -100,35 +95,8 @@ class Bam2Telbam(parabam.core.Interface):
       if not os.access(outbam_dir, os.W_OK | os.X_OK):
         exit_with_msg(f"Error: do not have right permission to write into outbam_dir path: '{outbam_dir}'")
 
-    for input_path in input_paths:
-
-      if self.verbose:
-        print(f" Generating TELBAM from: {input_path}")
-        print(f"\t- TELBAM generation started {self.__get_date_time__()}")
-
-      subset_interface = parabam.Subset(
-        temp_dir=self.temp_dir,
-        total_procs=self.total_procs,
-        task_size=self.task_size,
-        reader_n=self.reader_n,
-        verbose=self.verbose,
-        pair_process=True,
-        include_duplicates=True,
-        keep_in_temp=keep_in_temp,
-      )
-      # call to parabam subset
-      telbam_paths = subset_interface.run(
-        input_paths=[input_path],
-        subsets=subset_types,
-        constants=telbam_constants,
-        rule=rule,
-        outbam_dir=outbam_dir
-      )
-      if self.verbose:
-        print(f"\t- TELBAM generation finished {self.__get_date_time__()}")
-
-      gc.collect()
-      final_output_paths.update(telbam_paths)
+    telbam_paths = telbam.process_alignments(outbam_dir, self.total_procs, self.temp_dir, input_paths, verbose=self.verbose)
+    final_output_paths.update(telbam_paths)
 
     self.__goodbye__()
     return final_output_paths
@@ -167,8 +135,11 @@ class Bam2Telbam(parabam.core.Interface):
       % (self.instance_name, self.header_line, self.header_line,)
     )
 
-    for arg_name in ['input_bam', 'outbam_dir']:
+    for arg_name in ['input_bam', 'outbam_dir', 'reference']:
       add_arg[arg_name](parser)
+
+    parser.add_argument("-s", help=SUPPRESS)
+    parser.add_argument("-f", help=SUPPRESS)
 
     return parser
 
