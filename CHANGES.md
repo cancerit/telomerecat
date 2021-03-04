@@ -1,11 +1,20 @@
 # CHANGES
 
-# 3.4.0
+## NEXT
+
+* Multiprocessing `fork` is slowly being dropped:
+  * [see here](https://docs.python.org/3/library/multiprocessing.html#multiprocessing.get_context)
+  * At present all subcommands are working under py 3.8
+* `telomerecat` no longer depends on parabam for BAM processing in bam2telbam (due to first point)
+  * `samtools` can rapidly bring pairs together, rule migrated to dedicated code
+  * Slightly faster
+
+## 3.4.0
 
 * Fixed float being passed to randint function.
 * Now installs cython as CI was breaking.
 
-# 3.3.0
+## 3.3.0
 
 * Code are migrated to python3, and does not support python2 anymore.
 * added command line option `--temp_dir` to allow user to specify a folder for intermediate files.
@@ -27,7 +36,7 @@
 2017/5/26 - Telomerecat v3.1.2 - jhrf
 
 - Added a check in bam2telbam rule that ensures the read.seq is loaded into
-  the read and does not return None. This was causing a hang in PCAWG samples 
+  the read and does not return None. This was causing a hang in PCAWG samples
 - Tidied up the code surrounding mismatching loci following code review.
   Process should be easier to follow now
 - Minor bug fixes and restructing in telbam2length

@@ -1,9 +1,11 @@
 from typing import List
 import os
+import sys
 import pysam
 import logging
 import tempfile
 import multiprocessing as mp
+import subprocess
 from functools import partial
 
 from telomerecat.constants import TEL_PATS, HTS_EXT_TO_AF_MODE
@@ -38,19 +40,18 @@ def get_hts_processes(processes):
 
 def telbam_path(dest_dir:str, xam_file:str):
     (base, ext) = os.path.splitext(os.path.basename(xam_file))
-    return os.path.join(dest_dir, f'{base}_telbam{ext}')
+    return os.path.join(dest_dir, f'{base}_telbam.bam')
 
 
 def collate_pairs(xam_file: str, tmpdir:str, processes=1, reference=None):
     pairs = os.path.join(tmpdir, 'pairs.bam')
-    collate_opts = ['--no-PG', '-f', '-n', '1', '-l', '6', '-r', '5000000']  # ~8GB RAM
+    collate_opts = ['--no-PG', '-f', '-n', '1', '-l', '1', '-r', '5000000']  # ~8GB RAM
     if processes > 1:
         collate_opts.extend(['-@', str(processes)])
-    if reference is not None:
+    if reference:
         collate_opts.extend(['--reference', reference])
     collate_opts.extend(['-o', pairs, xam_file, os.path.join(tmpdir, 'collate')])
     pysam.collate(*collate_opts) # don't forget to splat, this isn't perl
-    tmp_size = os.path.getsize(pairs)
     return pairs
 
 
@@ -73,7 +74,7 @@ def pairs_to_telbam(af_pairs:AlignmentFile, af_telbam:AlignmentFile):
     return
 
 
-def to_telbam(xam_file:str, outbam_dir:str, tmpdir:str, quick=False, hts_processes=1, reference=None):
+def to_telbam_old(xam_file:str, outbam_dir:str, tmpdir:str, quick=False, hts_processes=1, reference=None):
     telbam_paths = {}
     with tempfile.TemporaryDirectory(prefix='telomerecat_', dir=tmpdir) as tmpdir:
         if quick is True:
@@ -87,6 +88,33 @@ def to_telbam(xam_file:str, outbam_dir:str, tmpdir:str, quick=False, hts_process
         af_pairs = get_align_file(pairs, mode='r', expectIndex=False, threads=hts_processes)
         af_telbam = get_align_file(telbam, mode='w', template=af_pairs)
         pairs_to_telbam(af_pairs, af_telbam)
+    return telbam_paths
+
+
+def to_telbam(xam_file:str, outbam_dir:str, tmpdir:str, quick=False, hts_processes=1, reference=None):
+    telbam = telbam_path(outbam_dir, xam_file)
+    telbam_paths = {xam_file: {'telbam': telbam}}
+
+    with tempfile.TemporaryDirectory(prefix='telomerecat_', dir=tmpdir) as this_tmp:
+        collate_wrap = ['pysam_collate', 'thin-wrap', '-t', str(this_tmp), '-@', str(hts_processes)]
+        if reference:
+            collate_wrap.extend(['--reference', reference])
+        collate_wrap.append(xam_file)
+        named_fifo = os.path.join(this_tmp, 'collatepipe.bam')
+        os.mkfifo(named_fifo)
+        collate_wrap.extend(['--output', named_fifo])
+        collate_proc = subprocess.Popen(collate_wrap)
+        af_pairs = get_align_file(named_fifo, mode='r', expectIndex=False, threads=hts_processes)
+        af_telbam = get_align_file(telbam, mode='w', template=af_pairs)
+        pairs_to_telbam(af_pairs, af_telbam)
+
+        # we should be finished anyway
+        (out_proc, err_proc) = collate_proc.communicate(timeout=15)
+        collate_exit_code = collate_proc.returncode
+        if collate_exit_code != 0:
+            print(f'ERROR: samtools collate process exited with a non-zero value ({collate_exit_code})')
+            sys.exit(collate_exit_code)
+
     return telbam_paths
 
 
@@ -106,14 +134,16 @@ def process_alignments(outbam_dir:str, processes:int, tmpdir:str, files:List[str
 
     parallel_processes = int(processes/hts_processes)
     # allow non-multiprocess use when minimal files, helpful for debugging
-    if parallel_processes <= 1:
+    if parallel_processes <= 1 or len(files) == 1:
         logging.debug(f'Inline execution of telbam generation, {hts_processes} threads per process')
+        # allow max threads for helpers
+        hts_processes = processes
         for xam_file in files:
             telbam_path = to_telbam(xam_file, outbam_dir=outbam_dir, tmpdir=tmpdir, quick=quick, hts_processes=hts_processes, reference=reference)
             telbam_paths.update(telbam_path)
     else:
-        logging.debug(f'Multiprocessing execution of telbam generation, {hts_processes} threads per process, {parallele_processes} in parallel')
-        with ctx.Pool(processes=parallele_processes) as pool:
+        logging.debug(f'Multiprocessing execution of telbam generation, {hts_processes} threads per process, {parallel_processes} in parallel')
+        with ctx.Pool(processes=parallel_processes) as pool:
             results = pool.map(partial(to_telbam, outbam_dir=outbam_dir, tmpdir=tmpdir, quick=quick, hts_processes=hts_processes, reference=reference), files)
         for telbam_path in results:
             telbam_paths.update(telbam_path)

@@ -13,9 +13,10 @@ setup(
   author_email="cgphelp@sanger.ac.uk",
   packages=["telomerecat"],
   package_dir={"telomerecat": "telomerecat"},
-  install_requires=["parabam>=2.3.2", "numpy", "pysam", "pandas"],
+  install_requires=["parabam>=2.3.2", "numpy", "pysam", "pandas", "click"],
   include_package_data=True,
   scripts=["./telomerecat/bin/telomerecat"],
+  entry_points={'console_scripts': ['pysam_collate=telomerecat.pysam_collate:cli'],},
   zip_safe=False,
 
 )
