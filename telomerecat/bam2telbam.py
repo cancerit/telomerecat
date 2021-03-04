@@ -67,9 +67,9 @@ class Bam2Telbam(parabam.core.Interface):
     cmd line interface. Requires an argparse parser. Users should call
     the `run` function."""
 
-    self.run(input_paths=self.cmd_args.input, outbam_dir=self.cmd_args.outbam_dir)
+    self.run(input_paths=self.cmd_args.input, outbam_dir=self.cmd_args.outbam_dir, reference=self.cmd_args.reference)
 
-  def run(self, input_paths, outbam_dir=None):
+  def run(self, input_paths, outbam_dir=None, reference=None):
     """The main function for invoking the part of the
        program which creates a telbam from a bam
 
@@ -87,15 +87,18 @@ class Bam2Telbam(parabam.core.Interface):
 
     final_output_paths = {}
 
-    keep_in_temp = outbam_dir is None
-    if not keep_in_temp:
-      # check if the folder is writable
-      if not os.path.exists(outbam_dir):
-        exit_with_msg(f"Error: can not find outbam_dir path: '{outbam_dir}'")
-      if not os.access(outbam_dir, os.W_OK | os.X_OK):
-        exit_with_msg(f"Error: do not have right permission to write into outbam_dir path: '{outbam_dir}'")
+    if outbam_dir is None:
+      keep_in_temp = True
+      outbam_dir = self.temp_dir
+    else:
+      outbam_dir = os.path.normpath(outbam_dir)
+      if os.path.exists(outbam_dir):
+        if not os.access(outbam_dir, os.W_OK | os.X_OK):
+          exit_with_msg(f"Error: do not have right permission to write into outbam_dir path: '{outbam_dir}'")
+      else:
+        os.makedirs(outbam_dir)
 
-    telbam_paths = telbam.process_alignments(outbam_dir, self.total_procs, self.temp_dir, input_paths, verbose=self.verbose)
+    telbam_paths = telbam.process_alignments(outbam_dir, self.total_procs, self.temp_dir, input_paths, reference=reference, verbose=self.verbose)
     final_output_paths.update(telbam_paths)
 
     self.__goodbye__()
