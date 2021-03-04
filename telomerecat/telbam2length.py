@@ -791,13 +791,14 @@ class ReadStatsFactory(object):
       random_counts = np.zeros(matrix_shape)
       mima_counts = np.zeros(matrix_shape)
 
+      if seed_randomness:
+          random.seed(RANDOM_SEED)
+
       for read in simple_reads:
         mima_counts[read.n_loci, int(read.avg_qual)] += 1
 
         sample_size = len(read.mima_loci)
         if sample_size > 0:
-          if seed_randomness:
-            random.seed(RANDOM_SEED)
           rand_quals = random.sample(list(read.qual), sample_size)
           qual_bytes = [ord(q) - phred_offset for q in rand_quals]
           rand_avg = np.mean(qual_bytes)

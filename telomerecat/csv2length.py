@@ -125,13 +125,14 @@ class LengthSimulator(object):
     invalid_read = 0
     total = 0
 
+    if self.seed_randomness:
+      random.seed(RANDOM_SEED)
+
+    tel_len_int = int(math.floor(tel_len))
+
     while total < (obs_total):
-      if self.seed_randomness:
-        random.seed(RANDOM_SEED)
       insert_size = random.gauss(insert_mean, insert_sigma)
-      if self.seed_randomness:
-        random.seed(RANDOM_SEED)
-      location = random.randint(0, int(math.floor(tel_len)))
+      location = random.randint(0, tel_len_int)
       if is_complete(location, insert_size):
         est_complete += 1
         total += 1
