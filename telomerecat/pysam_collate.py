@@ -21,7 +21,7 @@ def thin_wrap(output, threads, reference, tmpdir, in_bam_cram):
     """Simple wrapper around pysam.collate to avoid requiring system installed samtools"""
 
     prefix = os.path.join(tmpdir, 'collate')
-    collate_opts = ['--no-PG', '-r', '5000000', '-f', '--output-fmt', 'BAM', '-l', '0']
+    collate_opts = ['--no-PG', '-r', '2500000', '-f', '--output-fmt', 'BAM', '-l', '0']
     collate_opts.extend(['-o', output])
     collate_opts.extend(['-@', str(threads)])
     if reference:
