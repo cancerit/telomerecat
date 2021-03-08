@@ -47,6 +47,14 @@ Please see the command line help:
 telomerecat --help
 ```
 
+### Processes
+
+When selecting the number of processes/threads the following should be considered:
+
+* Single sample/input - 1, 2 or 4 recommended
+* Multi sample/input - even values
+  * parallel bam2telbam processes will be started with 2 cpus each (assuming >2 processes)
+
 ### Package Dependancies
 
 `pip` will install the relevant dependancies, listed here for convenience:

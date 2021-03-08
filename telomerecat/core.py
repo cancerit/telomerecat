@@ -65,7 +65,7 @@ class TelomerecatInterface(parabam.core.Interface, metaclass=ABCMeta):
         "The amount of times to run the length simulator.\n"
         "A higher number better captures the uncertainty \n"
         "produced by the insert length\n"
-        "distribution [Deafult 10]"
+        "distribution [Default 10]"
       ),
     )
     parser.add_argument(
