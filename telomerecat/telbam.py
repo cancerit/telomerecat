@@ -74,23 +74,6 @@ def pairs_to_telbam(af_pairs:AlignmentFile, af_telbam:AlignmentFile):
     return
 
 
-def to_telbam_old(xam_file:str, outbam_dir:str, tmpdir:str, quick=False, hts_processes=1, reference=None):
-    telbam_paths = {}
-    with tempfile.TemporaryDirectory(prefix='telomerecat_', dir=tmpdir) as tmpdir:
-        if quick is True:
-            pairs = xam_file
-        else:
-            pairs = collate_pairs(xam_file, tmpdir, hts_processes, reference=reference)
-
-        telbam = telbam_path(outbam_dir, xam_file)
-        telbam_paths[xam_file] = {'telbam': telbam}
-
-        af_pairs = get_align_file(pairs, mode='r', expectIndex=False, threads=hts_processes)
-        af_telbam = get_align_file(telbam, mode='w', template=af_pairs)
-        pairs_to_telbam(af_pairs, af_telbam)
-    return telbam_paths
-
-
 def to_telbam(xam_file:str, outbam_dir:str, tmpdir:str, quick=False, hts_processes=1, reference=None):
     telbam = telbam_path(outbam_dir, xam_file)
     telbam_paths = {xam_file: {'telbam': telbam}}
