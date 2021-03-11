@@ -42,7 +42,7 @@ FROM ubuntu:20.04
 
 LABEL maintainer="cgphelp@sanger.ac.uk" \
       uk.ac.sanger.cgp="Cancer, Ageing and Somatic Mutation, Wellcome Trust Sanger Institute" \
-      version="3.4.1" \
+      version="4.0.0" \
       description="telomerecat docker"
 
 RUN apt-get -yq update
