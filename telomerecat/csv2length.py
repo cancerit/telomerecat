@@ -20,7 +20,7 @@ import pandas as pd
 from argparse import SUPPRESS
 from functools import partial
 from shutil import copy
-from multiprocessing import Pool, freeze_support
+from multiprocessing import Pool, freeze_support, get_context
 
 from telomerecat import core
 
@@ -125,13 +125,14 @@ class LengthSimulator(object):
     invalid_read = 0
     total = 0
 
+    if self.seed_randomness:
+      random.seed(RANDOM_SEED)
+
+    tel_len_int = int(math.floor(tel_len))
+
     while total < (obs_total):
-      if self.seed_randomness:
-        random.seed(RANDOM_SEED)
       insert_size = random.gauss(insert_mean, insert_sigma)
-      if self.seed_randomness:
-        random.seed(RANDOM_SEED)
-      location = random.randint(0, int(math.floor(tel_len)))
+      location = random.randint(0, tel_len_int)
       if is_complete(location, insert_size):
         est_complete += 1
         total += 1
@@ -151,7 +152,7 @@ class LengthSimulator(object):
 
 
 class Csv2Length(core.TelomerecatInterface):
-  def __init__(self, temp_dir=None, total_procs=8, verbose=False, announce=True, cmd_run=False):
+  def __init__(self, temp_dir=None, total_procs=4, verbose=False, announce=True, cmd_run=False):
 
     super(Csv2Length, self).__init__(
       instance_name="telomerecat csv2length",
@@ -167,7 +168,7 @@ class Csv2Length(core.TelomerecatInterface):
 
     self.run(
       input_paths=self.cmd_args.input,
-      correct_f2a=not self.cmd_args.disable_correction,
+      correct_f2a=self.cmd_args.enable_correction,
       output_paths=output_paths,
       prior_weight=self.cmd_args.prior_weight,
       seed_randomness=self.cmd_args.seed_randomness,
@@ -179,12 +180,12 @@ class Csv2Length(core.TelomerecatInterface):
     self.__introduce__()
     self.__generate_output_paths__(input_paths, output_paths)
 
-    self.__output__(" Commencing length estimation | %s\n" % (self.__get_date_time__(),), 1)
+    self.__output__(f" Commencing length estimation | {self.__get_date_time__()}", 1)
 
     for input_path, output_path in zip(input_paths, output_paths):
       if self.announce:
-        self.__output__("\tInput: %s\n" % (input_path,), 1)
-        self.__output__(" \tOutput: %s\n" % (output_path,), 1)
+        self.__output__(f"\tInput: {input_path}", 1)
+        self.__output__(f" \tOutput: {output_path}", 1)
 
       counts = pd.read_csv(input_path)
       counts = self.__get_length_from_dataframe__(
@@ -192,7 +193,7 @@ class Csv2Length(core.TelomerecatInterface):
       )
 
       self.__output_length_results__(counts, output_path)
-      self.__output__("\n", 1)
+      self.__output__('', 1)
 
     self.__goodbye__()
     return output_paths
@@ -229,7 +230,6 @@ class Csv2Length(core.TelomerecatInterface):
 
     theta_observed = counts["F2a"] / (counts["F2"] + counts["F4"])
 
-    prior_weight = 3
     theta_expected = sum(theta_observed * counts["F2"]) / sum(counts["F2"])
 
     theta_corrected = (
@@ -252,8 +252,7 @@ class Csv2Length(core.TelomerecatInterface):
   def __get_lengths__(self, counts, seed_randomness, simulator_n):
     lengths = []
     for i, sample in counts.iterrows():
-      sample_intro = "\t- %s | %s\n" % (sample["Sample"], self.__get_date_time__())
-      self.__output__(sample_intro, 2)
+      self.__output__(f"\t- {sample['Sample']} | {self.__get_date_time__()}", 2)
 
       length_mean, len_std = run_simulator_par(
         sample["Insert_mean"],
@@ -291,7 +290,7 @@ class Csv2Length(core.TelomerecatInterface):
 
       The csv2length command allows the user to genereate new TL
       estimates from a previously generated CSV. This could be useful
-      if the user wishes to re-run analysis with different options 
+      if the user wishes to re-run analysis with different options
       (such as F2a correction) and does not wish to reanalyse
       the TELBAM files.
 
@@ -339,12 +338,13 @@ class Csv2Length(core.TelomerecatInterface):
 
 def check_results(sim_results):
   if 0 in sim_results:
-    sys.stderr.write(
+    print(
       "[WARNING] Telomere length reported zero. This means telomercat\n"
       + "\tfailed to identify enough complete or boundary reads.\n"
       + "\tThis  may mean your original sample was preprocessed to remove \n"
       + "\ttelomere reads. Alternatively this sample could have \n"
-      + "\tvery short average TL.\n"
+      + "\tvery short average TL.",
+      file=sys.stderr
     )
 
 
@@ -372,6 +372,7 @@ def estimator_process(job, insert_mu, insert_sigma, complete, boundary, read_len
 def run_simulator_par(insert_mu, insert_sigma, complete, boundary, proc, read_len, seed_randomness, simulator_n):
 
   freeze_support()
+  #with get_context("forkserver").Pool(proc) as p:
   p = Pool(proc)
   sim_partial = partial(
     estimator_process,
@@ -385,6 +386,7 @@ def run_simulator_par(insert_mu, insert_sigma, complete, boundary, proc, read_le
 
   results = p.map(sim_partial, range(simulator_n))
   p.close()
+
   check_results(results)
   return (np.mean(results), np.std(results))
 

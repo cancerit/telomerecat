@@ -6,3 +6,5 @@
 /.travis.yml
 /env
 /dist
+/venv
+__pycache__

@@ -6,7 +6,6 @@ It's primary responsibility is to define the default parameters for argparse
 Author: jhrf
 """
 
-import sys
 from argparse import SUPPRESS
 import parabam
 from abc import ABCMeta
@@ -19,7 +18,7 @@ class TelomerecatInterface(parabam.core.Interface, metaclass=ABCMeta):
     instance_name,
     temp_dir=None,
     task_size=10000,
-    total_procs=8,
+    total_procs=4,
     reader_n=2,
     verbose=False,
     announce=True,
@@ -39,8 +38,7 @@ class TelomerecatInterface(parabam.core.Interface, metaclass=ABCMeta):
 
   def __output__(self, outstr, level=-1):
     if self.verbose and (self.verbose >= level or level == -1):
-      sys.stdout.write(outstr)
-      sys.stdout.flush()
+      print(outstr)
 
   def default_parser(self):
     parser = super(TelomerecatInterface, self).default_parser()
@@ -67,7 +65,7 @@ class TelomerecatInterface(parabam.core.Interface, metaclass=ABCMeta):
         "The amount of times to run the length simulator.\n"
         "A higher number better captures the uncertainty \n"
         "produced by the insert length\n"
-        "distribution [Deafult 10]"
+        "distribution [Default 10]"
       ),
     )
     parser.add_argument(
@@ -85,17 +83,10 @@ class TelomerecatInterface(parabam.core.Interface, metaclass=ABCMeta):
       # Use the seed (42) for all randomnesses in telomerecat to produce stable results.
       help=SUPPRESS  # this option is hidden from users.
     )
-    # TODO: Implement these additional parameters:
-    #
-    # parser.add_argument(
-    #     '-b', '--brief_csv',
-    #     action="store_true", default=False,
-    #     help=('The output CSV will be comprised of\n'
-    #            'only the essential columns'))
-    # parser.add_argument(
-    #     '-w', '--prior_weight',
-    #     metavar='INT', type=int, default=3,
-    #     help=('The weight given to the prior expectation\n'
-    #           'in F2a correction [Default 3]'))
+    parser.add_argument(
+        '-w', '--prior_weight',
+        metavar='INT', type=int, default=3,
+        help=('The weight given to the prior expectation\n'
+              'in F2a correction [Default 3]'))
 
     return parser

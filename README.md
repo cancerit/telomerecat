@@ -14,13 +14,46 @@ Telomerecat is available as a Docker container on [Quay.io][quay-repo].
 
 [![Quay Badge][quay-status]][quay-repo]
 
+No "latest" image is defined, you need to specify the version you require, e.g.:
+
+```bash
+export VERSION_TEL=3.4.1 # update as appropriate
+docker pull quay.io/wtsicgp/telomerecat:${VERSION_TEL}
+```
+
+## Singularity
+
+The docker container is known to work with singularity, save the image locally via:
+
+```bash
+export VERSION_TEL=3.4.1 # update as appropriate
+singularity pull docker://quay.io/wtsicgp/telomerecat:${VERSION_TEL}
+```
+
 ## INSTALL
 
 Installation is via `pip`.  Simply execute with the URL to a package release, e.g.:
 
 ```bash
-pip install https://github.com/cancerit/telomerecat/archive/3.4.0.tar.gz
+export VERSION_TEL=3.4.1 # update as appropriate
+pip3 install https://github.com/cancerit/telomerecat/archive/${VERSION_TEL}.tar.gz
 ```
+
+## Basic usage
+
+Please see the command line help:
+
+```bash
+telomerecat --help
+```
+
+### Processes
+
+When selecting the number of processes/threads the following should be considered:
+
+* Single sample/input - 1, 2 or 4 recommended
+* Multi sample/input - even values
+  * parallel bam2telbam processes will be started with 2 cpus each (assuming >2 processes)
 
 ### Package Dependancies
 
@@ -33,12 +66,13 @@ pip install https://github.com/cancerit/telomerecat/archive/3.4.0.tar.gz
 
 ## Development Dependencies
 
-### Setup VirtualEnv
+You will need virtualenv available on your system.
+
+### Create a virtual python environement
 
 ```bash
 cd $PROJECTROOT
-hash virtualenv || pip3 install virtualenv
-virtualenv -p python3 env
+python3 -m venv env
 source env/bin/activate
 pip install -r requirements.txt
 python setup.py develop # so bin scripts can find module
