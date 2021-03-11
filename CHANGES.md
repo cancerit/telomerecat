@@ -1,13 +1,14 @@
 # CHANGES
 
-## NEXT
+## 4.0.0
 
-* Multiprocessing `fork` is slowly being dropped:
-  * [see here](https://docs.python.org/3/library/multiprocessing.html#multiprocessing.get_context)
-  * At present all subcommands are working under py 3.8
 * `telomerecat` no longer depends on parabam for BAM processing in bam2telbam (due to first point)
-  * `samtools` can rapidly bring pairs together, rule migrated to dedicated code
+  * Multiprocessing `fork` is slowly being dropped:
+    * [see here](https://docs.python.org/3/library/multiprocessing.html#multiprocessing.get_context)
+    * At present all subcommands are working under py 3.8
+  * `samtools collate` can rapidly bring pairs together, rule migrated to dedicated code
   * Slightly faster
+* CRAM inputs now supported, output alignments remain BAM
 
 ## 3.4.0
 
