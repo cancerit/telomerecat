@@ -66,12 +66,13 @@ When selecting the number of processes/threads the following should be considere
 
 ## Development Dependencies
 
-### Setup VirtualEnv
+You will need virtualenv available on your system.
+
+### Create a virtual python environement
 
 ```bash
 cd $PROJECTROOT
-hash virtualenv || pip3 install virtualenv
-virtualenv -p python3 env
+python3 -m venv env
 source env/bin/activate
 pip install -r requirements.txt
 python setup.py develop # so bin scripts can find module

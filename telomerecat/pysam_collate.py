@@ -1,17 +1,11 @@
 #!/usr/bin/env python3
-import sys
 import os
-import time
 import pkg_resources
 import pysam
 import click
 
-@click.group()
+@click.command()
 @click.version_option(pkg_resources.require("telomerecat")[0].version)
-def cli():
-    pass
-
-@cli.command()
 @click.option('--output', required=True, type=str, help='File or named pipe')
 @click.option('-@', '--threads', required=False, type=int, default=1, show_default=True, help='Helper threads')
 @click.option('--reference', required=False, type=str, default=None, show_default=True, help='Reference FASTA, required for CRAM')

@@ -62,7 +62,7 @@ RUN locale-gen en_US.UTF-8
 RUN update-locale LANG=en_US.UTF-8
 
 ENV CGP_OPT /opt/wtsi-cgp
-ENV PATH $CGP_OPT/bin:$CGP_OPT/bin:$PATH
+ENV PATH $CGP_OPT/bin:$PATH
 ENV PYTHONPATH $CGP_OPT/lib/python3.8/site-packages
 ENV LD_LIBRARY_PATH $OPT/lib
 ENV LC_ALL en_US.UTF-8
