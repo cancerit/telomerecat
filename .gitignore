@@ -1,8 +1,9 @@
 telomerecat.egg*
-dist*
+/dist*
 build*
 .DS_Store
 *swp
 *pyc
 /.vscode
 /env
+/venv

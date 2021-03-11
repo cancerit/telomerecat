@@ -8,7 +8,7 @@ Author: jhrf
 """
 
 import textwrap
-
+from argparse import SUPPRESS
 from telomerecat.core import TelomerecatInterface
 
 # import args
@@ -19,7 +19,7 @@ class Bam2Length(TelomerecatInterface):
     self,
     temp_dir=None,
     task_size=250000,
-    total_procs=8,
+    total_procs=4,
     reader_n=1,
     verbose=False,
     announce=True,
@@ -122,7 +122,7 @@ class Bam2Length(TelomerecatInterface):
 
       If you wish to generate TELBAMS seperately from length estimation
       you should use the bam2telbam command.
-      
+
       Type `telomerecat bam2telbam` to find out more.
 
     %s
@@ -130,8 +130,11 @@ class Bam2Length(TelomerecatInterface):
       % (self.instance_name, self.header_line, self.header_line,)
     )
 
-    for arg_name in ['input_bam', 'outbam_dir', 'output_csv', 'trim', 'nreads_for_task']:
+    for arg_name in ['input_bam', 'outbam_dir', 'output_csv', 'trim', 'nreads_for_task', 'reference']:
       add_arg[arg_name](parser)
+
+    parser.add_argument("-s", help=SUPPRESS)
+    parser.add_argument("-f", help=SUPPRESS)
 
     return parser
 
