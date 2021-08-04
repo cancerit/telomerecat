@@ -27,9 +27,7 @@ jobs:
             echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USER" --password-stdin
             echo "$QUAYIO_PASSWORD" | docker login -u "$QUAYIO_USER" --password-stdin quay.io
             docker build -t $IMAGE_NAME:$CLEAN_BRANCH .
-            docker run -t --rm $IMAGE_NAME:$CLEAN_BRANCH telomerecat bam2length -h
-            docker run -t --rm $IMAGE_NAME:$CLEAN_BRANCH telomerecat bam2telbam -h
-            docker run -t --rm $IMAGE_NAME:$CLEAN_BRANCH telomerecat telbam2length -h
+            docker run -t --rm $IMAGE_NAME:$CLEAN_BRANCH telomerecat version
             if [ "$CIRCLE_TAG" = "$BRANCH_OR_TAG" ]; then
               echo 'Pushing image'
               docker push $IMAGE_NAME:$CLEAN_BRANCH
