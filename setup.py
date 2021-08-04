@@ -6,6 +6,8 @@ setup(
   name="telomerecat",
   version='4.0.1',
   description="Telomere Computational Analysis Tool",
+  long_description=open('README.md').read(),
+  long_description_content_type='text/markdown',
   url='https://github.com/cancerit/telomerecat',
   author="JHR Farmery",
   license="GPL",
@@ -18,5 +20,4 @@ setup(
   scripts=["./telomerecat/bin/telomerecat"],
   entry_points={'console_scripts': ['pysam_collate=telomerecat.pysam_collate:thin_wrap'],},
   zip_safe=False,
-
 )
