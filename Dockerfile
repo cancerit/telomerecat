@@ -36,6 +36,8 @@ RUN curl -sSL https://github.com/cancerit/parabam/archive/${BRANCH_OR_TAG_PARABA
 # build the tools in this repo, separate to reduce build time on errors
 COPY setup.py .
 COPY telomerecat telomerecat
+# need this to be able to do a local build
+COPY README.md .
 RUN python3 setup.py install --prefix=$CGP_OPT
 
 FROM ubuntu:20.04
