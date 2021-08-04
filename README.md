@@ -1,8 +1,6 @@
 # Telomerecat (Telomere Computational Analysis Tool)
 
-| Master                                        | Develop                                         |
-| --------------------------------------------- | ----------------------------------------------- |
-| [![Master Badge][travis-master]][travis-base] | [![Develop Badge][travis-develop]][travis-base] |
+[![cancerit](https://circleci.com/gh/cancerit/telomerecat.svg?style=svg)](https://circleci.com/gh/cancerit/telomerecat)
 
 Telomerecat is a tool for estimating the average telomere length (TL) for a paired end, whole genome sequencing (WGS) sample.
 
@@ -10,9 +8,7 @@ Telomerecat is adaptable, accurate and fast. The algorithm accounts for sequenci
 
 ## Docker container
 
-Telomerecat is available as a Docker container on [Quay.io][quay-repo].
-
-[![Quay Badge][quay-status]][quay-repo]
+Telomerecat is available as a Docker container on [Quay.io][quay-tags].
 
 No "latest" image is defined, you need to specify the version you require, e.g.:
 
@@ -84,12 +80,5 @@ python setup.py develop # so bin scripts can find module
 
 CircleCI will handle docker image push to quay.io and package deployment to pypi.
 
-<!-- Travis -->
-[travis-base]: https://travis-ci.org/cancerit/telomerecat
-[travis-master]: https://travis-ci.org/cancerit/telomerecat.svg?branch=master
-[travis-develop]: https://travis-ci.org/cancerit/telomerecat.svg?branch=develop
-
 <!-- Quay.io -->
-[quay-status]: https://quay.io/repository/wtsicgp/telomerecat/status
-[quay-repo]: https://quay.io/repository/wtsicgp/telomerecat
-[quay-builds]: https://quay.io/repository/wtsicgp/telomerecat?tab=builds
+[quay-tags]: https://quay.io/repository/wtsicgp/telomerecat?tab=tags
