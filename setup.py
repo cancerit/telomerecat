@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
   name="telomerecat",
-  version='4.0.1',
+  version='4.0.2',
   description="Telomere Computational Analysis Tool",
   long_description=open('README.md').read(),
   long_description_content_type='text/markdown',

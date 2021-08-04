@@ -1,5 +1,11 @@
 # CHANGES
 
+## 4.0.2
+
+* Removes the quay.io build badge as the build is via CircleCI
+* Adds CircleCi build badge
+* Remove Travis badges
+
 ## 4.0.1
 
 * Add minimal compression to `pysam_collate` stability issue, suspect filling pipe buffer
