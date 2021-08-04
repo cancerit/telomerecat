@@ -3,7 +3,7 @@ USER root
 
 # Version of tools that are going to be installed.
 # can specify  "<commit-id>", "hotfix/X.X.X", "feature/fixstuff" or "3.4.1"
-ARG BRANCH_OR_TAG_PARABAM="3.0.0"
+ARG BRANCH_OR_TAG_PARABAM="3.0.1"
 
 RUN apt-get -yq update
 RUN apt-get install -yq --no-install-recommends \
@@ -36,13 +36,14 @@ RUN curl -sSL https://github.com/cancerit/parabam/archive/${BRANCH_OR_TAG_PARABA
 # build the tools in this repo, separate to reduce build time on errors
 COPY setup.py .
 COPY telomerecat telomerecat
+# need this to be able to do a local build
+COPY README.md .
 RUN python3 setup.py install --prefix=$CGP_OPT
 
 FROM ubuntu:20.04
 
 LABEL maintainer="cgphelp@sanger.ac.uk" \
       uk.ac.sanger.cgp="Cancer, Ageing and Somatic Mutation, Wellcome Trust Sanger Institute" \
-      version="4.0.0" \
       description="telomerecat docker"
 
 RUN apt-get -yq update

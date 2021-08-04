@@ -1,5 +1,12 @@
 # CHANGES
 
+## 4.0.1
+
+* Add minimal compression to `pysam_collate` stability issue, suspect filling pipe buffer
+* Add threads to hts writer of telbam
+* Remove requirements file as controlled by `setup.py`
+* Migrate to circleci (automate pypi deploy)
+
 ## 4.0.0
 
 * `telomerecat` no longer depends on parabam for BAM processing in bam2telbam (due to first point)
