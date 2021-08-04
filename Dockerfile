@@ -3,7 +3,7 @@ USER root
 
 # Version of tools that are going to be installed.
 # can specify  "<commit-id>", "hotfix/X.X.X", "feature/fixstuff" or "3.4.1"
-ARG BRANCH_OR_TAG_PARABAM="3.0.0"
+ARG BRANCH_OR_TAG_PARABAM="3.0.1"
 
 RUN apt-get -yq update
 RUN apt-get install -yq --no-install-recommends \
