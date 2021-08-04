@@ -9,7 +9,7 @@ setup(
   url='https://github.com/cancerit/telomerecat',
   author="JHR Farmery",
   license="GPL",
-  python_requires='>= 3.6',
+  python_requires='>= 3.7',
   author_email="cgphelp@sanger.ac.uk",
   packages=["telomerecat"],
   package_dir={"telomerecat": "telomerecat"},

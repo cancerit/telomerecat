@@ -36,7 +36,7 @@ jobs:
             fi
   test_pypi_publish:
     docker:
-      - image: circleci/python:3.6.4
+      - image: circleci/python:3.7
     steps:
       - checkout  # checkout source code to working directory
       - run:
@@ -47,7 +47,7 @@ jobs:
             pipenv run twine upload --repository testpypi dist/*
   pypi_publish:
     docker:
-      - image: circleci/python:3.6.4
+      - image: circleci/python:3.7
     steps:
       - checkout  # checkout source code to working directory
       - run:
