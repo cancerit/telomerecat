@@ -4,8 +4,8 @@
 
 * Add minimal compression to `pysam_collate` stability issue, suspect filling pipe buffer
 * Add threads to hts writer of telbam
-* Fixup requirements file
-* migrate to circleci
+* Remove requirements file as controlled by `setup.py`
+* Migrate to circleci (automate pypi deploy)
 
 ## 4.0.0
 

@@ -76,20 +76,13 @@ source env/bin/activate
 python setup.py develop # so bin scripts can find module
 ```
 
-### Cutting a release
+## Cutting a release
 
-1. Check version in setup.py has been updated
-2. Follow standard Hubflow release process (within cancerit)
-3. Deploy to pypi
+1. Check version in `setup.py` has been updated
+2. Check parabam version in `setup.py`/`Dockerfile`
+3. Follow standard Hubflow release process (within cancerit)
 
-```bash
-source venv/bin/activate
-python3 setup.py sdist
-# needed for upload
-pip install twine
-twine upload dist/*
-# username/password - see keepass for pypi entries.
-```
+CircleCI will handle docker image push to quay.io and package deployment to pypi.
 
 <!-- Travis -->
 [travis-base]: https://travis-ci.org/cancerit/telomerecat
