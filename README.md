@@ -73,7 +73,6 @@ You will need virtualenv available on your system.
 cd $PROJECTROOT
 python3 -m venv env
 source env/bin/activate
-pip install -r requirements.txt
 python setup.py develop # so bin scripts can find module
 ```
 
