@@ -10,7 +10,7 @@
 
 version: 2.1
 jobs:
-  build:
+  build_docker:
     environment:
       IMAGE_NAME: quay.io/wtsicgp/telomerecat
     docker:
@@ -36,15 +36,49 @@ jobs:
             else
               echo "I am not a tag so not pushing image"
             fi
+  test_pypi_publish:
+    docker:
+      - image: circleci/python:3.6.4
+    steps:
+      - checkout  # checkout source code to working directory
+      - run:
+          command: |  # create whl, install twine and publish to Test PyPI
+            python setup.py sdist bdist_wheel
+            sudo pip install pipenv
+            pipenv install twine
+            pipenv run twine upload --repository testpypi dist/*
+  pypi_publish:
+    docker:
+      - image: circleci/python:3.6.4
+    steps:
+      - checkout  # checkout source code to working directory
+      - run:
+          command: |  # create whl, install twine and publish to PyPI
+            python setup.py sdist bdist_wheel
+            sudo pip install pipenv
+            pipenv install twine
+            pipenv run twine upload dist/*
 
 workflows:
   version: 2.1
-  build_test:
+  build_test_publish:
     jobs:
-      - build:
+      - build_docker:
           context:
             - dockerhub-casmservice
             - quayio-casmservice
+          filters:
+            tags:
+              only: /.+/
+      - test_pypi_publish:
+          context:
+            - pypi-twine-uploads
+      - pypi_publish:
+          requires:
+            - build_docker
+            - test_pypi_publish
+          context:
+            - pypi-twine-uploads
           filters:
             tags:
               only: /.+/
