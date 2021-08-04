@@ -1,0 +1,89 @@
+# 1. Set your GitHub default branch to dev/develop
+# 2. In circleci project settings->advanced set:
+#    - GitHub Status Updates (this should be on already)
+#    - Only build pull requests
+#    - Auto-cancel redundant builds
+#    - Free and Open Source (this should be on already)
+# 3. If existing project with quay.io, remove the quay build triggers.
+#    - as circleci is pusing the image
+#    - reevaluate when/if quay.io adds ability to authenticate pulls
+
+version: 2.1
+jobs:
+  build_docker:
+    environment:
+      IMAGE_NAME: quay.io/wtsicgp/telomerecat
+    docker:
+      - image: circleci/buildpack-deps:stretch
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Build Docker image
+          command: |
+            set -e
+            BRANCH_OR_TAG="${CIRCLE_TAG:-$CIRCLE_BRANCH}"
+            CLEAN_BRANCH=$(echo $BRANCH_OR_TAG | tr / -)
+            echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USER" --password-stdin
+            echo "$QUAYIO_PASSWORD" | docker login -u "$QUAYIO_USER" --password-stdin quay.io
+            docker build -t $IMAGE_NAME:$CLEAN_BRANCH .
+            docker run -t --rm $IMAGE_NAME:$CLEAN_BRANCH telomerecat version
+            if [ "$CIRCLE_TAG" = "$BRANCH_OR_TAG" ]; then
+              echo 'Pushing image'
+              docker push $IMAGE_NAME:$CLEAN_BRANCH
+            else
+              echo "I am not a tag so not pushing image"
+            fi
+  test_pypi_publish:
+    docker:
+      - image: circleci/python:3.7
+    steps:
+      - checkout  # checkout source code to working directory
+      - run:
+          command: |  # create whl, install twine and publish to Test PyPI
+            set -e
+            python setup.py sdist
+            sudo pip install pipenv
+            pipenv install twine
+            pipenv run twine check --strict dist/*
+
+  pypi_publish:
+    docker:
+      - image: circleci/python:3.7
+    steps:
+      - checkout  # checkout source code to working directory
+      - run:
+          command: |  # create whl, install twine and publish to PyPI
+            python setup.py sdist
+            sudo pip install pipenv
+            pipenv install twine
+            pipenv run twine upload dist/*
+
+workflows:
+  version: 2.1
+  build_test_publish:
+    jobs:
+      - build_docker:
+          context:
+            - dockerhub-casmservice
+            - quayio-casmservice
+          filters:
+            tags:
+              only: /.+/
+      - test_pypi_publish:
+          context:
+            - pypi-twine-uploads
+          filters:
+            tags:
+              only: /.+/
+      - pypi_publish:
+          requires:
+            - build_docker
+            - test_pypi_publish
+          context:
+            - pypi-twine-uploads
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /.+/
