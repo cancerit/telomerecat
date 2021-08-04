@@ -71,6 +71,9 @@ workflows:
       - test_pypi_publish:
           context:
             - pypi-twine-uploads
+          filters:
+            tags:
+              only: /.+/
       - pypi_publish:
           requires:
             - build_docker
