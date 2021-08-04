@@ -35,8 +35,7 @@ singularity pull docker://quay.io/wtsicgp/telomerecat:${VERSION_TEL}
 Installation is via `pip`.  Simply execute with the URL to a package release, e.g.:
 
 ```bash
-export VERSION_TEL=3.4.1 # update as appropriate
-pip3 install https://github.com/cancerit/telomerecat/archive/${VERSION_TEL}.tar.gz
+pip3 install telomerecat
 ```
 
 ## Basic usage
@@ -80,15 +79,17 @@ python setup.py develop # so bin scripts can find module
 
 ### Cutting a release
 
-The release is handled by wheel:
+1. Check version in setup.py has been updated
+2. Follow standard Hubflow release process (within cancerit)
+3. Deploy to pypi
 
 ```bash
-$ source env/bin/activate # if not already
-$ python setup.py bdist_wheel -d dist
-# this creates an wheel archive which can be copied to a deployment location, e.g.
-$ scp telomerecat-3.2-py3-none-any.whl user@host:~/wheels
-# on host
-$ pip install --find-links=~/wheels telomerecat
+source venv/bin/activate
+python3 setup.py sdist
+# needed for upload
+pip install twine
+twine upload dist/*
+# username/password - see keepass for pypi entries.
 ```
 
 <!-- Travis -->

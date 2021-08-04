@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
   name="telomerecat",
-  version='4.0.0',
+  version='4.0.1',
   description="Telomere Computational Analysis Tool",
   url='https://github.com/cancerit/telomerecat',
   author="JHR Farmery",

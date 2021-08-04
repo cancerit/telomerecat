@@ -88,7 +88,7 @@ def to_telbam(xam_file:str, outbam_dir:str, tmpdir:str, hts_processes=1, referen
         collate_wrap.extend(['--output', named_fifo])
         collate_proc = subprocess.Popen(collate_wrap)
         af_pairs = get_align_file(named_fifo, mode='r', expectIndex=False, threads=hts_processes)
-        af_telbam = get_align_file(telbam, mode='w', template=af_pairs)
+        af_telbam = get_align_file(telbam, mode='w', template=af_pairs, threads=hts_processes)
         pairs_to_telbam(af_pairs, af_telbam)
 
         # we should be finished anyway
