@@ -45,7 +45,7 @@ jobs:
             python setup.py sdist
             sudo pip install pipenv
             pipenv install twine
-            twine check --strict dist/*
+            pipenv run twine check --strict dist/*
 
   pypi_publish:
     docker:
