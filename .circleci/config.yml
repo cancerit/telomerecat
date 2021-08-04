@@ -78,5 +78,7 @@ workflows:
           context:
             - pypi-twine-uploads
           filters:
+            branches:
+              ignore: /.*/
             tags:
               only: /.+/
